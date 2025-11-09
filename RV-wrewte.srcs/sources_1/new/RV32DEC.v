@@ -58,7 +58,7 @@ module RV32DEC(
     assign rs1addr = (U_type | J_type)? 5'b0 : instr[19:15];
     assign rs2addr = (R_type | S_type | B_type)? instr[24:20] : 5'b0;
     assign funct3  = (U_type | J_type)? 3'b0 : instr[14:12];
-    assign funct7  = (I_type | R_type)? instr[31:25] : 7'b0;
+    assign funct7  = R_type? instr[31:25] : 7'b0;
     
     wire [31:0] I_imm;
     wire [31:0] S_imm;
