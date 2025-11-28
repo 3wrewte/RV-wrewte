@@ -1,3 +1,4 @@
+//FILE DEC.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -71,4 +72,4 @@ module DEC #(
     //endgenerate
 
                                                          
-endmodule
+endmodule//ENDFILE DEC.v

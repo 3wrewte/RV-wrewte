@@ -1,3 +1,4 @@
+//FILE top.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -35,3 +36,4 @@ module top(
         .out_en()
     );
 endmodule
+//ENDFILE top.v

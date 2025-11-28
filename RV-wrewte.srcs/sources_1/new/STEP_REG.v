@@ -1,3 +1,4 @@
+//FILE STEP_REG.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -41,3 +42,4 @@ module STEP_REG#(
         end
     end
 endmodule
+//ENDFILE STEP_REG.v

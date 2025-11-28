@@ -1,25 +1,5 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 07/06/2025 10:22:46 PM
-// Design Name: 
-// Module Name: RV32TOP
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-
 module RV32TOP(
     input          clk   ,
     input          rst_n ,
@@ -28,7 +8,9 @@ module RV32TOP(
     output [31:0]  out   ,
     output         out_en
     );
+    // unified enable signals produced by CU
     wire en_dec, en_ex, en_mem, en_wb;
+    wire setz_fetch, setz_dec, setz_ex, setz_mem;
     wire [31:0]ocu;
     
     wire [31:0] instr_if_dec;
@@ -67,6 +49,9 @@ module RV32TOP(
     wire [31:0]   taddr_mem_wb;
     wire         branch_mem_wb;
     
+    // "pre" opcode from DEC (combinational) so CU can know if DEC instruction is branch/jump
+    wire [6:0] opcode_pre_dec;
+    
     wire [4:0]  rd_addr   ;
     wire [31:0] rd_data   ;
     wire        pc_jump   ;
@@ -78,38 +63,33 @@ module RV32TOP(
     wire [31:0] bus_data  ;
     wire [ 2:0] bus_width ;
     wire [31:0] bus_D_data;
-    //wire [ 6:0]  opcode;
-    //wire [31:0]     rs1;
-    //wire [31:0]     rs2;
-    //wire [ 4:0]  rdaddr;
-    //wire [ 2:0]  funct3;
-    //wire [ 6:0]  funct7;
-    //wire [31:0]     imm;
-    //wire [31:0]      pc;
     
-    
+    // FETCH
     RV32FETCH RV32FETCH_u(
         .clk      (clk      ),
         .rst_n    (rst_n    ),
-        .en1      (en_dec   ),
-        .en2      (en_ex    ),
+        .en1      (en_dec   ),  // en_dec provided by CU
+        .en2      (en_ex    ),  // en_ex provided by CU
         .write    (pc_jump  ),
         .wdata    (pc_data  ),
+        .setz_fetch(setz_fetch),
         .instr_out(instr_if_dec),
         .pc_out   (pc_if_dec   )
     );
     
+    // DEC/REG
     RV32DEC_REG RV32DEC_REG_u(
         .clk       (clk       ),
         .rst_n     (rst_n     ),
         .instr_in  (instr_if_dec),
         .pc_in     (pc_if_dec   ),
-        .en1       (en_ex     ),
-        .en2       (en_mem    ),
+        .en1       (en_ex     ), // from CU
+        .en2       (en_mem    ), // from CU
+        .setz_dec  (setz_dec  ), // from CU
         .waddr     (rd_addr   ),
         .wdata     (rd_data   ),
         .ocu       (ocu       ),
-        .en_out    (en_dec    ),
+        //.en_out    (en_dec    ), // removed: CU provides en_dec
         .opcode_out(opcode_dec_ex),
         .rs1_out   (   rs1_dec_ex),
         .rs2_out   (   rs2_dec_ex),
@@ -117,9 +97,11 @@ module RV32TOP(
         .funct3_out(funct3_dec_ex),
         .funct7_out(funct7_dec_ex),
         .imm_out   (   imm_dec_ex),
-        .pc_out    (    pc_dec_ex)
+        .pc_out    (    pc_dec_ex),
+        .opcode_pre(opcode_pre_dec)
     );
     
+    // EX
     RV32EX RV32EX_u(
         .clk       (clk       ),
         .rst_n     (rst_n     ),
@@ -131,10 +113,11 @@ module RV32TOP(
         .funct7_in (funct7_dec_ex),
         .imm_in    (   imm_dec_ex),
         .pc_in     (    pc_dec_ex),
-        .en1       (en_mem    ),
-        .en2       (en_wb     ),
-        .ocu       (ocu       ),
-        .en_out    (en_ex     ),
+        .en1       (en_mem    ), // CU-driven
+        .en2       (en_wb     ), // CU-driven
+        .ocu       (ocu       ),  // provide current decode ocu for conflict tests
+        .setz_ex   (setz_ex),
+        //.en_out    (en_ex     ), // original en_out removed (CU controls)
         .opcode_out(opcode_ex_mem),
         .rs1_out   (   rs1_ex_mem),
         .rs2_out   (   rs2_ex_mem),
@@ -148,6 +131,7 @@ module RV32TOP(
         .branch_out(branch_ex_mem)
     );
     
+    // MEM
     RV32MEM RV32MEM_u(
         .clk       (clk       ),
         .rst_n     (rst_n     ),
@@ -162,9 +146,10 @@ module RV32TOP(
         .res_in    (   res_ex_mem),
         .taddr_in  ( taddr_ex_mem),
         .branch_in (branch_ex_mem),
-        .en1       (en_wb     ),
+        .en1       (en_wb     ), // CU-driven
         .ocu       (ocu       ),
-        .en_out    (en_mem    ),
+        .setz_mem  (setz_mem  ),
+        //.en_out    (en_mem    ), // removed: CU controls
         .opcode_out(opcode_mem_wb),
         .rs1_out   (   rs1_mem_wb),
         .rs2_out   (   rs2_mem_wb),
@@ -214,30 +199,35 @@ module RV32TOP(
         .taddr_in ( taddr_mem_wb),
         .branch_in(branch_mem_wb),
         .ocu      (ocu      ),
-        .en_out   (en_wb    ),
+        //.en_out   (en_wb    ), // removed
         .rdaddr   (rd_addr  ),
         .rd       (rd_data  ),
         .jump     (pc_jump  ),
         .pc       (pc_data  )
     );
+    
+    // Instantiate Control Unit
+    CU CU_u(
+        .clk(clk),
+        .rst_n(rst_n),
+        .ocu_dec(ocu),
+        .opcode_dec_pre(opcode_pre_dec),
+        .opcode_dec_ex(opcode_dec_ex),
+        .opcode_ex_mem(opcode_ex_mem),
+        .opcode_mem_wb(opcode_mem_wb),
+        .rdaddr_dec_ex(rdaddr_dec_ex),
+        .rdaddr_ex_mem(rdaddr_ex_mem),
+        .rdaddr_mem_wb(rdaddr_mem_wb),
+        .branch_ex_mem(branch_ex_mem),
+        .branch_mem_wb(branch_mem_wb),
+        .en_wb(en_wb),
+        .en_mem(en_mem),
+        .en_ex(en_ex),
+        .en_dec(en_dec),
+        .setz_fetch(setz_fetch),
+        .setz_dec(setz_dec),
+        .setz_ex(setz_ex),
+        .setz_mem(setz_mem)
+    );
+    
 endmodule
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        

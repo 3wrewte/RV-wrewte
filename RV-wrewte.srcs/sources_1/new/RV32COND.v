@@ -1,3 +1,4 @@
+//FILE RV32COND.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -43,3 +44,4 @@ module RV32COND(
         endcase
     end
 endmodule
+//ENDFILE RV32COND.v

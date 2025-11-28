@@ -1,3 +1,4 @@
+//FILE PC.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -42,3 +43,4 @@ module PC(
         end
     end
 endmodule
+//ENDFILE PC.v

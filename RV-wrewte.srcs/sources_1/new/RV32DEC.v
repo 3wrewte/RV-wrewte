@@ -1,3 +1,4 @@
+//FILE RV32DEC.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -98,3 +99,4 @@ module RV32DEC(
         endcase
     end
 endmodule
+//ENDFILE RV32DEC.v

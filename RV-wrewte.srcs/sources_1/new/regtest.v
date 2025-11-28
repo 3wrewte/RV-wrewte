@@ -1,3 +1,4 @@
+//FILE regtest.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -80,3 +81,4 @@ module regtest(
             wdata <= 8'b0 ;   
     end  
 endmodule
+//ENDFILE regtest.v

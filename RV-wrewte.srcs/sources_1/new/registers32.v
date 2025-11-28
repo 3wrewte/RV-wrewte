@@ -1,3 +1,4 @@
+//FILE registers32.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -70,4 +71,4 @@ endmodule
 //        .rdata1(rdata1),
 //        .rdata2(rdata2),
 //        .wdata (wdata )
-//    );
+//    );//ENDFILE registers32.v

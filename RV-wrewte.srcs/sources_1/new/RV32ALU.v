@@ -1,3 +1,4 @@
+//FILE RV32ALU.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -63,3 +64,4 @@ module RV32ALU(
         endcase
     end
 endmodule
+//ENDFILE RV32ALU.v

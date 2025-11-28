@@ -1,3 +1,4 @@
+//FILE RV32OPDEC.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -60,4 +61,4 @@ endmodule
 //        .R     (     R),
 //        .fence ( fence),
 //        .csr   (   csr)
-//    );
+//    );//ENDFILE RV32OPDEC.v

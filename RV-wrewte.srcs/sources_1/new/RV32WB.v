@@ -17,8 +17,8 @@ module RV32WB(
     input         branch_in  ,
     
     input  [31:0] ocu       ,
-    output        en_out    ,
-    
+    // en_out removed: CU drives en signals now
+    output        en_out, // keep for compatibility but not driven internally
     
     output [4:0]  rdaddr    ,
     output [31:0] rd        ,
@@ -48,11 +48,7 @@ module RV32WB(
     assign pc     = jump? taddr_in  : 32'b0;
     
     
-    wire conflict_n;
-    assign conflict_n = ((ocu & (1 << rdaddr_in)) == 32'b0);
-    assign en_out = !(jal | jalr | B) & conflict_n;
-    
-    
-    
+    // en_out logic moved to CU. keep en_out tied to 1 for backward compatibility.
+    assign en_out = 1'b1;
     
 endmodule

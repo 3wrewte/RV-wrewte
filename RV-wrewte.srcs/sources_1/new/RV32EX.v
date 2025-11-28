@@ -1,25 +1,5 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 07/06/2025 02:00:59 PM
-// Design Name: 
-// Module Name: RV32EX
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-
 module RV32EX(
     input         clk       ,
     input         rst_n     ,
@@ -33,10 +13,11 @@ module RV32EX(
     input [31:0]  imm_in    ,
     input [31:0]  pc_in     ,
     
-    input         en1       ,
-    input         en2       ,
+    input         en1       , // en_mem from CU
+    input         en2       , // en_wb  from CU
     input  [31:0] ocu       ,
-    output        en_out    ,
+    input         setz_ex,     // from CU
+    output        en_out,     // preserved as output? keep for compatibility (not driven)
     
     output [6:0]  opcode_out,
     output [31:0] rs1_out   ,
@@ -126,24 +107,22 @@ module RV32EX(
     );
     
     
-    wire conflict_n;
-    assign conflict_n = ((ocu & (1 << rdaddr_in)) == 32'b0);
-    assign en_out = (!(jal | jalr | B) & conflict_n) & en1;
+    // the conflict/en_out logic moved to CU; preserve en_out pin but drive to 1 for compatibility
+    assign en_out = 1'b1;
     
     
-    wire en, setz;
-    assign setz = en2 ^ en1;
+    wire en;
     assign en = en2;
-    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(opcode_in),.out(opcode_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs1_in   ),.out(rs1_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs2_in   ),.out(rs2_out   ));
-    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rdaddr_in),.out(rdaddr_out));
-    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct3_in),.out(funct3_out));
-    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct7_in),.out(funct7_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(imm_in   ),.out(imm_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(pc_in    ),.out(pc_out    ));
+    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(opcode_in),.out(opcode_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(rs1_in   ),.out(rs1_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(rs2_in   ),.out(rs2_out   ));
+    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(rdaddr_in),.out(rdaddr_out));
+    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(funct3_in),.out(funct3_out));
+    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(funct7_in),.out(funct7_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(imm_in   ),.out(imm_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(pc_in    ),.out(pc_out    ));
     
-    STEP_REG#(.WIDTH(32))STEP_REG_res   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(res      ),.out(res_out    ));
-    STEP_REG#(.WIDTH(32))STEP_REG_taddr (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(taddr    ),.out(taddr_out    ));
-    STEP_REG#(.WIDTH(32))STEP_REG_branch(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(branch   ),.out(branch_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_res   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(res      ),.out(res_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_taddr (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(taddr    ),.out(taddr_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_branch(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_ex),.in(branch   ),.out(branch_out    ));
 endmodule

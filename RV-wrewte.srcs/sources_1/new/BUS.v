@@ -1,3 +1,4 @@
+//FILE BUS.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -69,3 +70,4 @@ module BUS(
         end
     end
 endmodule
+//ENDFILE BUS.v

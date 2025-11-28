@@ -1,3 +1,4 @@
+//FILE test.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -39,3 +40,4 @@ regtest regtest_u(
     );
 
 endmodule
+//ENDFILE test.v

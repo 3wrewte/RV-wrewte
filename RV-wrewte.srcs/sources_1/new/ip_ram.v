@@ -1,3 +1,4 @@
+//FILE ip_ram.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -88,3 +89,4 @@ always @(posedge clk or negedge rst_n) begin
         din <= 8'b0 ;   
 end  
 endmodule
+//ENDFILE ip_ram.v

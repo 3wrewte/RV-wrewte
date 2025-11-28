@@ -1,36 +1,17 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 07/06/2025 01:59:46 PM
-// Design Name: 
-// Module Name: RV32DEC_REG
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-
 module RV32DEC_REG(
     input         clk       ,
     input         rst_n     ,
     input [31:0]  instr_in  ,
     input [31:0]  pc_in     ,
-    input         en1       ,
-    input         en2       ,
+    input         en1       , // en_ex from CU
+    input         en2       , // en_mem from CU
+    input         setz_dec  , // flush from CU (replaces local en2^en1)
     input [4:0]   waddr     ,
     input [31:0]  wdata     ,
     output [31:0] ocu       ,
-    output        en_out    ,
+    // note: en_out removed (CU drives en signals centrally)
     output [6:0]  opcode_out,
     output [31:0] rs1_out   ,
     output [31:0] rs2_out   ,
@@ -38,7 +19,9 @@ module RV32DEC_REG(
     output [2:0]  funct3_out,
     output [6:0]  funct7_out,
     output [31:0] imm_out   ,
-    output [31:0] pc_out 
+    output [31:0] pc_out   ,
+    // expose the pre-STEP_REG opcode (combinational) so CU can use it
+    output [6:0]  opcode_pre
     );
     wire[6:0]  opcode  ;
     wire[4:0]  rs1addr ;
@@ -72,17 +55,17 @@ module RV32DEC_REG(
         .wdata (wdata  )  
     );                   
     
-    wire en, setz;
-    assign setz = en2 ^ en1;
-    assign en = en2;
-    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(opcode),.out(opcode_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs1   ),.out(rs1_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs2   ),.out(rs2_out   ));
-    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rdaddr),.out(rdaddr_out));
-    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct3),.out(funct3_out));
-    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct7),.out(funct7_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(imm   ),.out(imm_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(pc_in ),.out(pc_out    ));
+    wire en;
+    assign en = en2; // pipeline register enable is en2 as before (driving the STEP_REG)
+    // setz is provided by CU now
+    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(opcode),.out(opcode_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(rs1   ),.out(rs1_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(rs2   ),.out(rs2_out   ));
+    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(rdaddr),.out(rdaddr_out));
+    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(funct3),.out(funct3_out));
+    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(funct7),.out(funct7_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(imm   ),.out(imm_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_dec),.in(pc_in ),.out(pc_out    ));
     
     RV32OPDEC RV32OPDEC_u(
         .opcode(opcode),
@@ -100,7 +83,7 @@ module RV32DEC_REG(
     );
     
     
-    assign en_out = !(jal | jalr | B) & en1;
+    // en_out is removed, CU owns en signals now.
     
     wire [31:0] ocu1;
     wire [31:0] ocu2;
@@ -117,5 +100,5 @@ module RV32DEC_REG(
         .out(ocu2)
     );
     assign ocu = (ocu1 | ocu2) & (~32'b1);
-    
+    assign opcode_pre = opcode; // expose pre-registered opcode for CU
 endmodule

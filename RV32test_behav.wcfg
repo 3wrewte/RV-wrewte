@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="RV32test_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="RV32test" />
+            <top_module name="glbl" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="93,758.333 ns"></ZoomStartTime>
+      <ZoomEndTime time="101,248.334 ns"></ZoomEndTime>
+      <Cursor1Time time="94,550.000 ns"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="270"></NameColumnWidth>
+      <ValueColumnWidth column_width="132"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="10" />
+   <wvobject type="logic" fp_name="/RV32test/sys_clk">
+      <obj_property name="ElementShortName">sys_clk</obj_property>
+      <obj_property name="ObjectShortName">sys_clk</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/sys_rst_n">
+      <obj_property name="ElementShortName">sys_rst_n</obj_property>
+      <obj_property name="ObjectShortName">sys_rst_n</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/out">
+      <obj_property name="ElementShortName">out[31:0]</obj_property>
+      <obj_property name="ObjectShortName">out[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/out_en">
+      <obj_property name="ElementShortName">out_en</obj_property>
+      <obj_property name="ObjectShortName">out_en</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/in">
+      <obj_property name="ElementShortName">in[31:0]</obj_property>
+      <obj_property name="ObjectShortName">in[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/in_en">
+      <obj_property name="ElementShortName">in_en</obj_property>
+      <obj_property name="ObjectShortName">in_en</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32FETCH_u/pc">
+      <obj_property name="ElementShortName">pc[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32DEC_REG_u/registers32_u/registers">
+      <obj_property name="ElementShortName">registers[0:31][31:0]</obj_property>
+      <obj_property name="ObjectShortName">registers[0:31][31:0]</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32MEM_u/data">
+      <obj_property name="ElementShortName">data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">data[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32MEM_u/D_data">
+      <obj_property name="ElementShortName">D_data[31:0]</obj_property>
+      <obj_property name="ObjectShortName">D_data[31:0]</obj_property>
+   </wvobject>
+</wave_config>

@@ -16,9 +16,10 @@ module RV32MEM(
     input [31:0]  taddr_in  ,
     input         branch_in ,
     
-    input         en1       ,
+    input         en1       , // en_wb from CU (used by STEP_REG en)
     input  [31:0] ocu       ,
-    output        en_out    ,
+    input         setz_mem,   // from CU (we keep this as input but historically it was 0)
+    output        en_out,    // keep pin for compatibility (not driven by module)
     
     output [6:0]  opcode_out,
     output [31:0] rs1_out   ,
@@ -67,26 +68,24 @@ module RV32MEM(
     assign width = funct3_in;
     
     
-    wire conflict_n;
-    assign conflict_n = ((ocu & (1 << rdaddr_in)) == 32'b0);
-    assign en_out = (!(jal | jalr | B) & conflict_n) & en1;
+    // conflict/en_out logic moved to CU
+    assign en_out = 1'b1;
     
     
-    wire en, setz;
-    assign setz = 1'b0;
-    assign en = 1'b1;
-    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(opcode_in),.out(opcode_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs1_in   ),.out(rs1_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rs2_in   ),.out(rs2_out   ));
-    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(rdaddr_in),.out(rdaddr_out));
-    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct3_in),.out(funct3_out));
-    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(funct7_in),.out(funct7_out));
-    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(imm_in   ),.out(imm_out   ));
-    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(pc_in    ),.out(pc_out    ));
+    wire en;
+    assign en = 1'b1; // preserved as before
+    STEP_REG#(.WIDTH(7 ))STEP_REG_opcode(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(opcode_in),.out(opcode_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs1   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(rs1_in   ),.out(rs1_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_rs2   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(rs2_in   ),.out(rs2_out   ));
+    STEP_REG#(.WIDTH(5 ))STEP_REG_rdaddr(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(rdaddr_in),.out(rdaddr_out));
+    STEP_REG#(.WIDTH(3 ))STEP_REG_funct3(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(funct3_in),.out(funct3_out));
+    STEP_REG#(.WIDTH(7 ))STEP_REG_funct7(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(funct7_in),.out(funct7_out));
+    STEP_REG#(.WIDTH(32))STEP_REG_imm   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(imm_in   ),.out(imm_out   ));
+    STEP_REG#(.WIDTH(32))STEP_REG_pc    (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(pc_in    ),.out(pc_out    ));
     
-    STEP_REG#(.WIDTH(32))STEP_REG_res   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(res      ),.out(res_out    ));
-    STEP_REG#(.WIDTH(32))STEP_REG_taddr (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(taddr_in ),.out(taddr_out    ));
-    STEP_REG#(.WIDTH(32))STEP_REG_branch(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz),.in(branch_in),.out(branch_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_res   (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(res      ),.out(res_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_taddr (.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(taddr_in ),.out(taddr_out    ));
+    STEP_REG#(.WIDTH(32))STEP_REG_branch(.clk(clk),.rst_n(rst_n),.en(en),.setz(setz_mem),.in(branch_in),.out(branch_out    ));
     
     
 endmodule
