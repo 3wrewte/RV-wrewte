@@ -26,16 +26,35 @@ module CU(
     input             branch_ex_mem, // branch result from EX (registered to MEM)
     input             branch_mem_wb, // branch result from MEM (registered to WB)
     // outputs: enables for each stage (driven by CU)
-    output reg        en_wb,
-    output reg        en_mem,
-    output reg        en_ex,
-    output reg        en_dec,
+    output reg        stall_FETCH_DEC,
+    output reg        stall_DEC_EX   ,
+    output reg        stall_EX_MEM   ,
+    output reg        stall_MEM_WB   ,
     // outputs: setz (flush) for pipeline registers; used by STEP_REG inside modules
-    output reg        setz_fetch, // used by RV32FETCH STEP_REGs
-    output reg        setz_dec,   // used by RV32DEC_REG STEP_REGs
-    output reg        setz_ex,    // used by RV32EX STEP_REGs
-    output reg        setz_mem    // used by RV32MEM STEP_REGs
+    output reg        flush_FETCH_DEC,
+    output reg        flush_DEC_EX   ,
+    output reg        flush_EX_MEM   ,
+    output reg        flush_MEM_WB   ,   
+    // output
+    output reg        en_PC
     );
+    reg en_dec;
+    reg en_ex ;
+    reg en_mem;
+    reg en_wb ;
+    
+    // en_X  (1 = enabled)
+    // stall_X (1 = stall)
+    always @(*) begin
+        stall_FETCH_DEC = ~en_ex  ;   // if dec not enabled => stall fetch->dec reg
+        stall_DEC_EX    = ~en_mem ;
+        stall_EX_MEM    = ~en_wb  ;
+        stall_MEM_WB    = 1'b0    ;
+    end
+    
+    always @(*) begin
+        en_PC = en_dec;
+    end
 
     // decode opcode flags (helper)
     function automatic [2:0] decode_flags;
@@ -89,13 +108,13 @@ module CU(
         en_dec = 1'b1;
 
         // WB gating by its own control (conservative)
-        en_wb = !(jal_mem_wb | jalr_mem_wb | B_mem_wb);
+        en_wb = !(jal_mem_wb | jalr_mem_wb | B_mem_wb) & (~conflict_wb);
 
         // MEM gated by its own control, conflict_wb, and en_wb
-        en_mem = !(jal_ex_mem | jalr_ex_mem | B_ex_mem) & (~conflict_wb) & en_wb;
+        en_mem = !(jal_ex_mem | jalr_ex_mem | B_ex_mem) & (~conflict_mem) & en_wb;
 
         // EX gated by its own control, conflict_mem, and en_mem
-        en_ex = !(jal_dec_ex | jalr_dec_ex | B_dec_ex) & (~conflict_mem) & en_mem;
+        en_ex = !(jal_dec_ex | jalr_dec_ex | B_dec_ex) & (~conflict_ex) & en_mem;
 
         // DEC (pre-STEP_REG) gated by its own control (use pre opcode) and en_ex
         en_dec = !(jal_dec_pre | jalr_dec_pre | B_dec_pre) & en_ex;
@@ -103,11 +122,10 @@ module CU(
 
     // setz (flush) signals: follow previous convention setz = en_next ^ en_current
     always @(*) begin
-        setz_fetch = en_ex ^ en_dec;   // FETCH STEP_REG used setz = en2 ^ en1 where en2=en_ex,en1=en_dec
-        setz_dec   = en_mem ^ en_ex;   // DEC STEP_REG used setz = en2 ^ en1 where en2=en_mem,en1=en_ex
-        setz_ex    = en_wb ^ en_mem;   // EX STEP_REG used setz = en2 ^ en1 where en2=en_wb,en1=en_mem
-        // Historically MEM used setz = 0 in user's code; keep that for minimal behavioral change:
-        setz_mem   = 1'b0;
+        flush_FETCH_DEC = en_ex ^ en_dec;   // FETCH STEP_REG used setz = en2 ^ en1 where en2=en_ex,en1=en_dec
+        flush_DEC_EX    = en_mem ^ en_ex;   // DEC STEP_REG used setz = en2 ^ en1 where en2=en_mem,en1=en_ex
+        flush_EX_MEM    = en_wb ^ en_mem;   // EX STEP_REG used setz = en2 ^ en1 where en2=en_wb,en1=en_mem
+        flush_MEM_WB    = ~en_wb        ;
     end
 
 endmodule

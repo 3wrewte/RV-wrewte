@@ -6,20 +6,21 @@
       <db_ref path="RV32test_behav.wdb" id="1">
          <top_modules>
             <top_module name="RV32test" />
+            <top_module name="\$unit_PIPELINE_REG_v_2057473099 " />
             <top_module name="glbl" />
          </top_modules>
       </db_ref>
    </db_ref_list>
    <zoom_setting>
-      <ZoomStartTime time="93,758.333 ns"></ZoomStartTime>
-      <ZoomEndTime time="101,248.334 ns"></ZoomEndTime>
-      <Cursor1Time time="94,550.000 ns"></Cursor1Time>
+      <ZoomStartTime time="87,452.100 ns"></ZoomStartTime>
+      <ZoomEndTime time="88,067.805 ns"></ZoomEndTime>
+      <Cursor1Time time="87,669.576 ns"></Cursor1Time>
    </zoom_setting>
    <column_width_setting>
-      <NameColumnWidth column_width="270"></NameColumnWidth>
-      <ValueColumnWidth column_width="132"></ValueColumnWidth>
+      <NameColumnWidth column_width="243"></NameColumnWidth>
+      <ValueColumnWidth column_width="119"></ValueColumnWidth>
    </column_width_setting>
-   <WVObjectSize size="10" />
+   <WVObjectSize size="42" />
    <wvobject type="logic" fp_name="/RV32test/sys_clk">
       <obj_property name="ElementShortName">sys_clk</obj_property>
       <obj_property name="ObjectShortName">sys_clk</obj_property>
@@ -44,20 +45,149 @@
       <obj_property name="ElementShortName">in_en</obj_property>
       <obj_property name="ObjectShortName">in_en</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32FETCH_u/pc">
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_FETCH/pc">
       <obj_property name="ElementShortName">pc[31:0]</obj_property>
       <obj_property name="ObjectShortName">pc[31:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32DEC_REG_u/registers32_u/registers">
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_FETCH/wdata">
+      <obj_property name="ElementShortName">wdata[31:0]</obj_property>
+      <obj_property name="ObjectShortName">wdata[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_FETCH/write">
+      <obj_property name="ElementShortName">write</obj_property>
+      <obj_property name="ObjectShortName">write</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_DEC_REG/registers32_u/registers">
       <obj_property name="ElementShortName">registers[0:31][31:0]</obj_property>
       <obj_property name="ObjectShortName">registers[0:31][31:0]</obj_property>
       <obj_property name="isExpanded"></obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32MEM_u/data">
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/stall_FETCH_DEC">
+      <obj_property name="ElementShortName">stall_FETCH_DEC</obj_property>
+      <obj_property name="ObjectShortName">stall_FETCH_DEC</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/stall_DEC_EX">
+      <obj_property name="ElementShortName">stall_DEC_EX</obj_property>
+      <obj_property name="ObjectShortName">stall_DEC_EX</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/stall_EX_MEM">
+      <obj_property name="ElementShortName">stall_EX_MEM</obj_property>
+      <obj_property name="ObjectShortName">stall_EX_MEM</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/stall_MEM_WB">
+      <obj_property name="ElementShortName">stall_MEM_WB</obj_property>
+      <obj_property name="ObjectShortName">stall_MEM_WB</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/flush_FETCH_DEC">
+      <obj_property name="ElementShortName">flush_FETCH_DEC</obj_property>
+      <obj_property name="ObjectShortName">flush_FETCH_DEC</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/flush_DEC_EX">
+      <obj_property name="ElementShortName">flush_DEC_EX</obj_property>
+      <obj_property name="ObjectShortName">flush_DEC_EX</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/flush_EX_MEM">
+      <obj_property name="ElementShortName">flush_EX_MEM</obj_property>
+      <obj_property name="ObjectShortName">flush_EX_MEM</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_CU/flush_MEM_WB">
+      <obj_property name="ElementShortName">flush_MEM_WB</obj_property>
+      <obj_property name="ObjectShortName">flush_MEM_WB</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/EX_in">
+      <obj_property name="ElementShortName">EX_in</obj_property>
+      <obj_property name="ObjectShortName">EX_in</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/MEM_in">
+      <obj_property name="ElementShortName">MEM_in</obj_property>
+      <obj_property name="ObjectShortName">MEM_in</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/WB_in">
+      <obj_property name="ElementShortName">WB_in</obj_property>
+      <obj_property name="ObjectShortName">WB_in</obj_property>
+      <obj_property name="isExpanded"></obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_WB/rdaddr">
+      <obj_property name="ElementShortName">rdaddr[4:0]</obj_property>
+      <obj_property name="ObjectShortName">rdaddr[4:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_WB/rd">
+      <obj_property name="ElementShortName">rd[31:0]</obj_property>
+      <obj_property name="ObjectShortName">rd[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_WB/jump">
+      <obj_property name="ElementShortName">jump</obj_property>
+      <obj_property name="ObjectShortName">jump</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_WB/pc_out">
+      <obj_property name="ElementShortName">pc_out[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pc_out[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_WB/opcode">
+      <obj_property name="ElementShortName">opcode[6:0]</obj_property>
+      <obj_property name="ObjectShortName">opcode[6:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_WB/jal">
+      <obj_property name="ElementShortName">jal</obj_property>
+      <obj_property name="ObjectShortName">jal</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_WB/jalr">
+      <obj_property name="ElementShortName">jalr</obj_property>
+      <obj_property name="ObjectShortName">jalr</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_WB/B">
+      <obj_property name="ElementShortName">B</obj_property>
+      <obj_property name="ObjectShortName">B</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/in1">
+      <obj_property name="ElementShortName">in1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">in1[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/in2">
+      <obj_property name="ElementShortName">in2[31:0]</obj_property>
+      <obj_property name="ObjectShortName">in2[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/funct3">
+      <obj_property name="ElementShortName">funct3[2:0]</obj_property>
+      <obj_property name="ObjectShortName">funct3[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/out">
+      <obj_property name="ElementShortName">out</obj_property>
+      <obj_property name="ObjectShortName">out</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/eq">
+      <obj_property name="ElementShortName">eq</obj_property>
+      <obj_property name="ObjectShortName">eq</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/less">
+      <obj_property name="ElementShortName">less</obj_property>
+      <obj_property name="ObjectShortName">less</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_EX/RV32COND_u/less_u">
+      <obj_property name="ElementShortName">less_u</obj_property>
+      <obj_property name="ObjectShortName">less_u</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_MEM/Load">
+      <obj_property name="ElementShortName">Load</obj_property>
+      <obj_property name="ObjectShortName">Load</obj_property>
+   </wvobject>
+   <wvobject type="logic" fp_name="/RV32test/RV32TOP_u/u_MEM/Store">
+      <obj_property name="ElementShortName">Store</obj_property>
+      <obj_property name="ObjectShortName">Store</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_MEM/addr">
+      <obj_property name="ElementShortName">addr[31:0]</obj_property>
+      <obj_property name="ObjectShortName">addr[31:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_MEM/data">
       <obj_property name="ElementShortName">data[31:0]</obj_property>
       <obj_property name="ObjectShortName">data[31:0]</obj_property>
    </wvobject>
-   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/RV32MEM_u/D_data">
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_MEM/width">
+      <obj_property name="ElementShortName">width[2:0]</obj_property>
+      <obj_property name="ObjectShortName">width[2:0]</obj_property>
+   </wvobject>
+   <wvobject type="array" fp_name="/RV32test/RV32TOP_u/u_MEM/D_data">
       <obj_property name="ElementShortName">D_data[31:0]</obj_property>
       <obj_property name="ObjectShortName">D_data[31:0]</obj_property>
    </wvobject>

@@ -53,7 +53,7 @@ module BUS(
         .rdata(RAM_rdata), 
         .wdata(bus      )
     );
-    assign out_en = (addr == 1);
+    assign out_en = (addr == 32'b100);
     assign out = out_en? bus : 32'b0;
     
     assign D_data = Load? bus: 32'b0;
