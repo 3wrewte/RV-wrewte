@@ -1,6 +1,6 @@
+//FILE RV32DEC_REG.v 
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
-// RV32DEC_REG.v -- now purely combinational decode + regfile read, pipeline regs moved to TOP
 
 
 module RV32DEC_REG(
@@ -64,7 +64,8 @@ module RV32DEC_REG(
     assign dec_out.funct7    = funct7;
     assign dec_out.result    = 32'b0;
     assign dec_out.taddr     = 32'b0;
-    assign dec_out.valid     = 1'b1; // indicate valid instruction in pipeline
+    assign dec_out.jump      = 1'b0;
+    assign dec_out.valid     = fetch_in.valid; // indicate valid instruction in pipeline
 
     // ocu: one-hot of rs1/rs2 (preserve previous behavior)
     wire [31:0] ocu1;
@@ -76,3 +77,4 @@ module RV32DEC_REG(
     assign opcode_pre = opcode; // expose pre-registered opcode for CU
 
 endmodule
+//ENDFILE RV32DEC_REG.v 

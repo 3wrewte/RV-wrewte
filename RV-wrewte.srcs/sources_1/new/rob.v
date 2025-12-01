@@ -1,5 +1,6 @@
-// rob.v
+//FILE rob.v
 `timescale 1ns / 1ps
+`include "PIPELINE_REG.v"
 // Simple ring-buffer ROB (minimal): no speculative state yet, just push/pop & full flag.
 // Fields stored minimal (valid + rdaddr) to avoid invasive changes.
 // push: assert to allocate a new entry (tail moves)
@@ -61,3 +62,4 @@ module ROB #(
     end
 
 endmodule
+//ENDFILE rob.v

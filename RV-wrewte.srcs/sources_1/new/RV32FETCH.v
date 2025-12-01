@@ -1,6 +1,6 @@
+//FILE RV32FETCH.v 
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
-// RV32FETCH.v  -- now purely combinational fetch, pipeline reg moved to TOP
 
 module RV32FETCH(
     input         clk,
@@ -46,6 +46,8 @@ module RV32FETCH(
     assign fetch_out.funct7    = 7'b0;
     assign fetch_out.result    = 32'b0;
     assign fetch_out.taddr     = 32'b0;
-    assign fetch_out.valid     = 1'b0;
+    assign fetch_out.jump      = 1'b0;
+    assign fetch_out.valid     = 1'b1;
 
 endmodule
+//ENDFILE RV32FETCH.v

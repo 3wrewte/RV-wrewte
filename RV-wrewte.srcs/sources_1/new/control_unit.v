@@ -1,3 +1,4 @@
+//FILE control_unit.v
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Control Unit (Centralized control for simple pipeline)
@@ -129,3 +130,4 @@ module CU(
     end
 
 endmodule
+//ENDFILE control_unit.v

@@ -1,4 +1,4 @@
-//FILE STEP_REG.v
+//FILE PIPELINE_REG.v
 `ifndef __PIPE_DEFS_SV__
 `define __PIPE_DEFS_SV__
 `timescale 1ns / 1ps
@@ -59,7 +59,8 @@ typedef struct packed {
     logic [6:0]  funct7  ;
     logic [31:0] result  ; //alu result
     logic [31:0] taddr   ; //target mem addr or target PC
-    logic        valid   ; //branch jump
+    logic        jump    ;
+    logic        valid   ; //1 if the pipe_t stores a real command 
 } pipe_t;
 
 
@@ -85,4 +86,4 @@ module PIPELINE_REG (
 
 endmodule
 `endif
-//ENDFILE STEP_REG.v
+//ENDFILE PIPELINE_REG.v

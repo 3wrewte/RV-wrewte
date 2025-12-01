@@ -1,6 +1,6 @@
+//FILE RV32MEM.v 
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
-// RV32MEM.v -- purely combinational memory stage (decides bus signals), pipeline regs in TOP
 
 
 module RV32MEM(
@@ -44,6 +44,8 @@ module RV32MEM(
     assign mem_out.funct7    = ex_in.funct7;
     assign mem_out.result    = result;
     assign mem_out.taddr     = ex_in.taddr;
+    assign mem_out.jump      = ex_in.jump;
     assign mem_out.valid     = ex_in.valid;
 
 endmodule
+//ENDFILE RV32MEM.v 

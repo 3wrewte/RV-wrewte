@@ -1,6 +1,7 @@
+//FILE RV32EX.v 
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
-// RV32EX.v -- now purely combinational EX logic; pipeline regs moved to TOP
+
 
 
 module RV32EX(
@@ -67,6 +68,9 @@ module RV32EX(
         .funct3(funct3),
         .out(branch)
     );
+    
+    wire jump;
+    assign jump = (jal | jalr | (B&branch));
 
     // pack outputs to ex_out
     assign ex_out.instr     = dec_in.instr;
@@ -82,7 +86,9 @@ module RV32EX(
     assign ex_out.funct7    = funct7;
     assign ex_out.result    = res;
     assign ex_out.taddr     = taddr;
-    assign ex_out.valid     = branch;
+    assign ex_out.jump      = jump;
+    assign ex_out.valid     = dec_in.valid;
     //assign ex_out.valid     = branch | jal | jalr | dec_in.valid; // mark special/valid
 
 endmodule
+//ENDFILE RV32EX.v 

@@ -1,3 +1,4 @@
+//FILE RV32TOP.v
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
 
@@ -239,3 +240,4 @@ module RV32TOP(
     //assign out_en = 1'b1;
 
 endmodule
+//ENDFILE RV32TOP.v

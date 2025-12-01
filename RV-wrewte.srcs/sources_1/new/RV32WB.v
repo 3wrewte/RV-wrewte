@@ -1,6 +1,6 @@
+//FILE RV32WB.v 
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
-// RV32WB.v -- writeback stage, purely combinational; pipeline regs in TOP
 
 
 module RV32WB(
@@ -12,13 +12,11 @@ module RV32WB(
     );
 
     wire [6:0] opcode = mem_in.opcode;
-    wire jal = (opcode == 7'b1101111);
-    wire jalr= (opcode == 7'b1100111);
-    wire B   = (opcode == 7'b1100011);
 
     assign rdaddr = mem_in.rd_addr;
     assign rd     = mem_in.result;
-    assign jump   = (jal | jalr | (B & mem_in.valid));
+    assign jump   = mem_in.jump;
     assign pc_out = jump ? mem_in.taddr : 32'b0;
 
 endmodule
+//ENDFILE RV32WB.v 
