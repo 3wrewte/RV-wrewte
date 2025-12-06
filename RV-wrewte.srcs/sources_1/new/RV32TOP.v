@@ -207,12 +207,6 @@ module RV32TOP(
         .rdaddr_mem_wb  (WB_in.rd_addr),
     
         //---------------------------
-        // branch results (registered)
-        //---------------------------
-        .branch_ex_mem  (MEM_in.valid),   // EX result registered into MEM
-        .branch_mem_wb  (WB_in.valid),   // MEM result registered into WB
-    
-        //---------------------------
         // outputs (STALL)
         //---------------------------
         .stall_FETCH_DEC(stall_FETCH_DEC),

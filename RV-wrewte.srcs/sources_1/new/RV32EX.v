@@ -54,7 +54,8 @@ module RV32EX(
     // taddr calc: target address for branch/jump or mem addr
     reg [31:0] taddr;
     always @(*) begin
-        if (jal || jalr) taddr = pc + imm;
+        if (jal) taddr = pc + imm;
+        else if (jalr) taddr = (rs1 + imm) & (~1);
         else if (B) taddr = pc + imm;
         else if (L || S) taddr = rs1 + imm;
         else taddr = 32'b0;

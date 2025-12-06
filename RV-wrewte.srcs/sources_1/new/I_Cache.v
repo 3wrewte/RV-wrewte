@@ -33,11 +33,11 @@ module I_Cache#(
     //input [31:0]             din
     );
     integer i;
-    reg [31:0] instructions [0:DEPTH - 1]; 
+    reg [7:0] instructions [0:DEPTH - 1]; 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
           for(i = 0; i < DEPTH; i= i + 1)begin
-              instructions[i] = 32'b0;
+              instructions[i] = 8'b0;
           end
           $readmemh("init_data.mem", instructions);  // 文件内容自动加载
         end else;
@@ -49,7 +49,7 @@ module I_Cache#(
     //    $readmemh("init_data.mem", instructions);  // 文件内容自动加载
     //end
     
-    assign rdata = instructions[pc >> 2];
+    assign rdata = {instructions[pc+3], instructions[pc+2], instructions[pc+1], instructions[pc]};
     //assign dout2 = instructions[r2addr];
 
 endmodule

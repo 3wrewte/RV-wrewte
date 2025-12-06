@@ -23,9 +23,6 @@ module CU(
     input      [4:0]  rdaddr_dec_ex, // rd in EX stage (from DEC->EX)
     input      [4:0]  rdaddr_ex_mem, // rd in MEM stage (from EX->MEM)
     input      [4:0]  rdaddr_mem_wb, // rd in WB stage (from MEM->WB)
-    // branch signals (registered)
-    input             branch_ex_mem, // branch result from EX (registered to MEM)
-    input             branch_mem_wb, // branch result from MEM (registered to WB)
     // outputs: enables for each stage (driven by CU)
     output reg        stall_FETCH_DEC,
     output reg        stall_DEC_EX   ,
