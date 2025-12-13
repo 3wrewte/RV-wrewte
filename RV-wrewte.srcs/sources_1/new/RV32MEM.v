@@ -31,6 +31,7 @@ module RV32MEM(
     wire [31:0] result = L ? D_data : ex_in.result;
 
     // pack mem_out
+    assign mem_out.rob_id    = ex_in.rob_id;
     assign mem_out.instr     = ex_in.instr;
     assign mem_out.pc        = ex_in.pc;
     assign mem_out.imm       = ex_in.imm;

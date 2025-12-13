@@ -33,6 +33,7 @@ module RV32FETCH(
 
     // pack into pipe_t
     // only instr and pc are meaningful at this stage; other fields zeroed
+    assign fetch_out.rob_id    = 32'b0;
     assign fetch_out.instr     = instr;
     assign fetch_out.pc        = pc;
     assign fetch_out.imm       = 32'b0;

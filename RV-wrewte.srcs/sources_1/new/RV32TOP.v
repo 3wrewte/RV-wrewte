@@ -30,17 +30,63 @@ module RV32TOP(
     //----------------------------
     // Control Unit signals
     //----------------------------
-    wire stall_FETCH_DEC, stall_DEC_EX, stall_EX_MEM, stall_MEM_WB;
-    wire flush_FETCH_DEC, flush_DEC_EX, flush_EX_MEM, flush_MEM_WB;
+    wire stall_if_dec, stall_dec_rob, stall_rob_ex, stall_ex_mem, stall_mem_wb;
+    wire flush_if_dec, flush_dec_rob, flush_rob_ex, flush_ex_mem, flush_mem_wb;
     wire en_PC;
-
+    
+    wire redirect_valid ;
+    wire [31:0] redirect_pc;
+    wire rob_alloc_ready;
+    wire rob_flush      ;
+    wire [31:0] rob_new_pc     ;
+    
+    pipe_t      alloc_in[1:0]     ;
+    wire        rob_alloc_ready   ;
+    pipe_t      issue_out        ;
+    pipe_t      recieve_in       ;
+    
+    assign recieve_in = WB_in;
     //----------------------------
-    // Writeback signals to regfile & PC
+    // rob
     //----------------------------
-    wire [4:0]  wb_rdaddr;
-    wire [31:0] wb_rddata;
-    wire        wb_jump;
-    wire [31:0] wb_pc;
+    
+    
+    rob rob_u(
+        .clk              (clk              ),
+        .rst_n            (rst_n            ),
+        .alloc_in         (alloc_in         ),
+        .rob_alloc_ready  (rob_alloc_ready  ),
+        .issue_out        (issue_out        ),
+        .recieve_in       (recieve_in       ),
+        .rob_flush        (rob_flush        ),
+        .rob_new_pc       (rob_new_pc       ) 
+    );
+    
+    //------------------------------------
+    // Control Unit
+    //------------------------------------
+    
+    CU CU_u(
+        .clk            (clk            ),
+        .rst_n          (rst_n          ),
+        .rob_alloc_ready(rob_alloc_ready),
+        .rob_flush      (rob_flush      ),
+        .rob_new_pc     (rob_new_pc     ),
+        .stall_if_dec   (stall_if_dec   ),
+        .stall_dec_rob  (stall_dec_rob  ),
+        .stall_rob_ex   (stall_rob_ex   ),
+        .stall_ex_mem   (stall_ex_mem   ),
+        .stall_mem_wb   (stall_mem_wb   ),
+        .flush_if_dec   (flush_if_dec   ),
+        .flush_dec_rob  (flush_dec_rob  ),
+        .flush_rob_ex   (flush_rob_ex   ),
+        .flush_ex_mem   (flush_ex_mem   ),
+        .flush_mem_wb   (flush_mem_wb   ),
+        .redirect_valid (redirect_valid ),
+        .redirect_pc    (redirect_pc    ),
+        .en_pc          (en_PC          )
+    );
+    
 
     //----------------------------
     // FETCH stage
@@ -48,8 +94,8 @@ module RV32TOP(
     RV32FETCH u_FETCH(
         .clk       (clk),
         .rst_n     (rst_n),
-        .write     (wb_jump),
-        .wdata     (wb_pc),
+        .write     (redirect_valid),
+        .wdata     (redirect_pc),
         .en_PC     (en_PC),
         .fetch_out (FETCH_out)
     );
@@ -60,8 +106,8 @@ module RV32TOP(
     PIPELINE_REG PIPELINE_REG_FETCH_DEC(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_FETCH_DEC),
-        .flush(flush_FETCH_DEC),
+        .stall(stall_if_dec),
+        .flush(flush_if_dec),
         .in   (FETCH_out),
         .out  (DEC_in)
     );
@@ -70,31 +116,35 @@ module RV32TOP(
     // DEC stage
     //----------------------------
     wire [31:0] ocu;
-    wire [6:0]  opcode_pre;
 
     RV32DEC_REG u_DEC_REG(
         .clk      (clk),
         .rst_n    (rst_n),
         .fetch_in (DEC_in),
-        .waddr    (wb_rdaddr),
-        .wdata    (wb_rddata),
-        .dec_out  (DEC_out),
-        .ocu      (ocu),
-        .opcode_pre(opcode_pre)
+        .dec_out  (DEC_out)
     );
 
     //----------------------------
-    // Pipeline Register: DEC -> EX
+    // Pipeline Register: DEC -> ROB
     //----------------------------
-    PIPELINE_REG PIPELINE_REG_DEC_EX(
+    PIPELINE_REG PIPELINE_REG_DEC_ROB(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_DEC_EX),
-        .flush(flush_DEC_EX),
+        .stall(stall_dec_rob),
+        .flush(flush_dec_rob),
         .in   (DEC_out),
+        .out  (alloc_in[0])
+    );
+    
+    PIPELINE_REG PIPELINE_REG_ROB_EX(
+        .clk  (clk),
+        .rst_n(rst_n),
+        .stall(stall_rob_ex),
+        .flush(flush_rob_ex),
+        .in   (issue_out),
         .out  (EX_in)
     );
-
+    
     //----------------------------
     // EX stage
     //----------------------------
@@ -110,8 +160,8 @@ module RV32TOP(
     PIPELINE_REG PIPELINE_REG_EX_MEM(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_EX_MEM),
-        .flush(flush_EX_MEM),
+        .stall(stall_ex_mem),
+        .flush(flush_ex_mem),
         .in   (EX_out),
         .out  (MEM_in)
     );
@@ -162,8 +212,8 @@ module RV32TOP(
     PIPELINE_REG PIPELINE_REG_MEM_WB(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_MEM_WB),
-        .flush(flush_MEM_WB),
+        .stall(stall_mem_wb),
+        .flush(flush_mem_wb),
         .in   (MEM_out),
         .out  (WB_in)
     );
@@ -171,59 +221,16 @@ module RV32TOP(
     //----------------------------
     // WB stage
     //----------------------------
-    RV32WB u_WB(
-        .mem_in (WB_in),
-        .rdaddr (wb_rdaddr),
-        .rd     (wb_rddata),
-        .jump   (wb_jump),
-        .pc_out (wb_pc)
-    );
+    //RV32WB u_WB(
+    //    .mem_in (WB_in),
+    //    .rdaddr (wb_rdaddr),
+    //    .rd     (wb_rddata),
+    //    .jump   (wb_jump),
+    //    .pc_out (wb_pc)
+    //);
 
-    //------------------------------------
-    // Control Unit
-    //------------------------------------
-    CU u_CU(
-        .clk   (clk),
-        .rst_n (rst_n),
     
-        //---------------------------
-        // decode stage COMBINATIONAL
-        //---------------------------
-        .ocu_dec        (ocu),              // from DEC_REG
-        .opcode_dec_pre (opcode_pre),       // raw opcode (before DEC->EX reg)
     
-        //---------------------------
-        // pipeline opcodes
-        //---------------------------
-        .opcode_dec_ex  (EX_in.opcode),   // DEC->EX
-        .opcode_ex_mem  (MEM_in.opcode),   // EX->MEM
-        .opcode_mem_wb  (WB_in.opcode),   // MEM->WB
-    
-        //---------------------------
-        // pipeline rd addresses
-        //---------------------------
-        .rdaddr_dec_ex  (EX_in.rd_addr),
-        .rdaddr_ex_mem  (MEM_in.rd_addr),
-        .rdaddr_mem_wb  (WB_in.rd_addr),
-    
-        //---------------------------
-        // outputs (STALL)
-        //---------------------------
-        .stall_FETCH_DEC(stall_FETCH_DEC),
-        .stall_DEC_EX   (stall_DEC_EX),
-        .stall_EX_MEM   (stall_EX_MEM),
-        .stall_MEM_WB   (stall_MEM_WB),
-    
-        //---------------------------
-        // outputs (FLUSH)
-        //---------------------------
-        .flush_FETCH_DEC(flush_FETCH_DEC),
-        .flush_DEC_EX   (flush_DEC_EX),
-        .flush_EX_MEM   (flush_EX_MEM),
-        .flush_MEM_WB   (flush_MEM_WB),
-        
-        .en_PC(en_PC)
-    );
 
 
     //----------------------------

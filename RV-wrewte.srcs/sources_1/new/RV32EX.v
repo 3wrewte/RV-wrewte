@@ -74,6 +74,7 @@ module RV32EX(
     assign jump = (jal | jalr | (B&branch));
 
     // pack outputs to ex_out
+    assign ex_out.rob_id    = dec_in.rob_id;
     assign ex_out.instr     = dec_in.instr;
     assign ex_out.pc        = pc;
     assign ex_out.imm       = imm;

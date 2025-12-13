@@ -7,11 +7,7 @@ module RV32DEC_REG(
     input         clk,
     input         rst_n,
     input  pipe_t fetch_in,   // from FETCH stage (combinational)
-    input  [4:0]  waddr,      // writeback port to regfile
-    input  [31:0] wdata,
-    output pipe_t dec_out,    // to EX stage
-    output [31:0] ocu,        // one-hot rs1/rs2 decode for CU usage
-    output [6:0] opcode_pre   // combinational opcode (for CU)
+    output pipe_t dec_out    // to EX stage
     );
 
     // decode instruction
@@ -39,23 +35,14 @@ module RV32DEC_REG(
     // registers32 module provides register file read (keeps its internal clocks)
     wire [31:0] rs1;
     wire [31:0] rs2;
-    registers32#(.depth(5)) registers32_u(
-        .clk   (clk),
-        .rst_n (rst_n),
-        .r1addr(rs1addr),
-        .r2addr(rs2addr),
-        .waddr (waddr),
-        .rdata1(rs1),
-        .rdata2(rs2),
-        .wdata (wdata)
-    );
 
     // fill dec_out pipe_t
+    assign dec_out.rob_id    = 32'b0;
     assign dec_out.instr     = instr;
     assign dec_out.pc        = pc;
     assign dec_out.imm       = imm;
-    assign dec_out.rs1_data  = rs1;
-    assign dec_out.rs2_data  = rs2;
+    assign dec_out.rs1_data  = 32'b0;
+    assign dec_out.rs2_data  = 32'b0;
     assign dec_out.rs1_addr  = rs1addr;
     assign dec_out.rs2_addr  = rs2addr;
     assign dec_out.rd_addr   = rdaddr;
@@ -67,14 +54,7 @@ module RV32DEC_REG(
     assign dec_out.jump      = 1'b0;
     assign dec_out.valid     = fetch_in.valid; // indicate valid instruction in pipeline
 
-    // ocu: one-hot of rs1/rs2 (preserve previous behavior)
-    wire [31:0] ocu1;
-    wire [31:0] ocu2;
-    DEC #(.WIDTH(5)) DEC_1(.in(rs1addr), .out(ocu1));
-    DEC #(.WIDTH(5)) DEC_2(.in(rs2addr), .out(ocu2));
-    assign ocu = (ocu1 | ocu2) & (~32'b1);
 
-    assign opcode_pre = opcode; // expose pre-registered opcode for CU
 
 endmodule
 //ENDFILE RV32DEC_REG.v 
