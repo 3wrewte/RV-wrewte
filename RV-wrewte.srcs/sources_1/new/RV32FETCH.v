@@ -2,53 +2,65 @@
 `timescale 1ns / 1ps
 `include "PIPELINE_REG.v"
 
-module RV32FETCH(
+module RV32FETCH#(
+    parameter FETCH_NUM = 1
+)(
     input         clk,
     input         rst_n,
     input         write,
     input  [31:0] wdata,
     input         en_PC,
-    output pipe_t fetch_out  // to DEC stage (wire)
+    output pipe_t fetch_out[FETCH_NUM-1:0]  // to DEC stage (wire)
     );
 
     // internal fetch
-    wire [31:0] instr;
-    wire [31:0] pc;
+    wire [31:0] instr[FETCH_NUM-1:0];
+    reg [31:0] pc;
 
-    PC PC_u(
-        .clk  (clk),
-        .rst_n(rst_n),
-        .write(write),
-        .wdata(wdata),
-        .en   (en_PC), 
-        .pc   (pc)
-    );
+    always @(posedge clk or negedge rst_n)begin
+        if(!rst_n)
+            pc <= 32'b0;
+        else begin
+            case({write, en_PC})
+                2'b00:pc <= pc;
+                2'b01:pc <= pc + (FETCH_NUM << 2);
+                2'b10:pc <= wdata;
+                2'b11:pc <= wdata;
+                default: pc <= pc;
+            endcase
+        end
+    end
 
-    I_Cache#(.DEPTH(256)) I_Cache_u(
+    I_Cache#(.DEPTH(256),.ISSUE(FETCH_NUM)) I_Cache_u(
         .clk  (clk),
         .rst_n(rst_n),
         .pc   (pc),
         .rdata(instr)
     );
-
-    // pack into pipe_t
-    // only instr and pc are meaningful at this stage; other fields zeroed
-    assign fetch_out.rob_id    = 32'b0;
-    assign fetch_out.instr     = instr;
-    assign fetch_out.pc        = pc;
-    assign fetch_out.imm       = 32'b0;
-    assign fetch_out.rs1_data  = 32'b0;
-    assign fetch_out.rs2_data  = 32'b0;
-    assign fetch_out.rs1_addr  = 5'b0;
-    assign fetch_out.rs2_addr  = 5'b0;
-    assign fetch_out.rd_addr   = 5'b0;
-    assign fetch_out.opcode    = 7'b0;
-    assign fetch_out.funct3    = 3'b0;
-    assign fetch_out.funct7    = 7'b0;
-    assign fetch_out.result    = 32'b0;
-    assign fetch_out.taddr     = 32'b0;
-    assign fetch_out.jump      = 1'b0;
-    assign fetch_out.valid     = 1'b1;
+    
+    genvar k;
+    generate
+    for(k = 0; k < FETCH_NUM; k= k + 1)begin
+        // pack into pipe_t
+        // only instr and pc are meaningful at this stage; other fields zeroed
+        assign fetch_out[k].rob_id    = 32'b0;
+        assign fetch_out[k].instr     = instr[k];
+        assign fetch_out[k].pc        = pc + (k << 2);
+        assign fetch_out[k].imm       = 32'b0;
+        assign fetch_out[k].rs1_data  = 32'b0;
+        assign fetch_out[k].rs2_data  = 32'b0;
+        assign fetch_out[k].rs1_addr  = 5'b0;
+        assign fetch_out[k].rs2_addr  = 5'b0;
+        assign fetch_out[k].rd_addr   = 5'b0;
+        assign fetch_out[k].opcode    = 7'b0;
+        assign fetch_out[k].funct3    = 3'b0;
+        assign fetch_out[k].funct7    = 7'b0;
+        assign fetch_out[k].result    = 32'b0;
+        assign fetch_out[k].taddr     = 32'b0;
+        assign fetch_out[k].jump      = 1'b0;
+        assign fetch_out[k].valid     = 1'b1;
+    end
+    endgenerate
 
 endmodule
 //ENDFILE RV32FETCH.v

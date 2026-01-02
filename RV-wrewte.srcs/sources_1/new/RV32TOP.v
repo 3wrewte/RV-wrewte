@@ -14,13 +14,14 @@ module RV32TOP(
     output [31:0] out,
     output        out_en
 );
+    parameter FETCH_NUM = 2;
 
     //----------------------------
     // Pipeline wires between stages
     //----------------------------
-    pipe_t FETCH_out;
-    pipe_t DEC_in;
-    pipe_t DEC_out;
+    pipe_t FETCH_out[FETCH_NUM - 1:0];
+    pipe_t DEC_in[FETCH_NUM - 1:0];
+    pipe_t DEC_out[FETCH_NUM - 1:0];
     pipe_t EX_in;
     pipe_t EX_out;
     pipe_t MEM_in;
@@ -40,7 +41,7 @@ module RV32TOP(
     wire rob_flush      ;
     wire [31:0] rob_new_pc     ;
     
-    pipe_t      alloc_in[1:0]     ;
+    pipe_t      alloc_in[FETCH_NUM - 1:0]     ;
     wire        rob_alloc_ready   ;
     pipe_t      issue_out        ;
     pipe_t      recieve_in       ;
@@ -51,7 +52,7 @@ module RV32TOP(
     //----------------------------
     
     
-    rob rob_u(
+    rob#(.ENTRY(FETCH_NUM)) rob_u(
         .clk              (clk              ),
         .rst_n            (rst_n            ),
         .alloc_in         (alloc_in         ),
@@ -91,7 +92,7 @@ module RV32TOP(
     //----------------------------
     // FETCH stage
     //----------------------------
-    RV32FETCH u_FETCH(
+    RV32FETCH#(.FETCH_NUM(FETCH_NUM)) u_FETCH(
         .clk       (clk),
         .rst_n     (rst_n),
         .write     (redirect_valid),
@@ -99,42 +100,46 @@ module RV32TOP(
         .en_PC     (en_PC),
         .fetch_out (FETCH_out)
     );
+    
+    genvar k;
+    generate
+    for(k = 0; k < FETCH_NUM; k = k + 1)begin
+        //----------------------------
+        // Pipeline Register: FETCH -> DEC
+        //----------------------------
+        PIPELINE_REG PIPELINE_REG_FETCH_DEC(
+            .clk  (clk),
+            .rst_n(rst_n),
+            .stall(stall_if_dec),
+            .flush(flush_if_dec),
+            .in   (FETCH_out[k]),
+            .out  (DEC_in[k])
+        );
 
-    //----------------------------
-    // Pipeline Register: FETCH -> DEC
-    //----------------------------
-    PIPELINE_REG PIPELINE_REG_FETCH_DEC(
-        .clk  (clk),
-        .rst_n(rst_n),
-        .stall(stall_if_dec),
-        .flush(flush_if_dec),
-        .in   (FETCH_out),
-        .out  (DEC_in)
-    );
+        //----------------------------
+        // DEC stage
+        //----------------------------
 
-    //----------------------------
-    // DEC stage
-    //----------------------------
-    wire [31:0] ocu;
+        RV32DEC_REG u_DEC_REG(
+            .clk      (clk),
+            .rst_n    (rst_n),
+            .fetch_in (DEC_in[k]),
+            .dec_out  (DEC_out[k])
+        );
 
-    RV32DEC_REG u_DEC_REG(
-        .clk      (clk),
-        .rst_n    (rst_n),
-        .fetch_in (DEC_in),
-        .dec_out  (DEC_out)
-    );
-
-    //----------------------------
-    // Pipeline Register: DEC -> ROB
-    //----------------------------
-    PIPELINE_REG PIPELINE_REG_DEC_ROB(
-        .clk  (clk),
-        .rst_n(rst_n),
-        .stall(stall_dec_rob),
-        .flush(flush_dec_rob),
-        .in   (DEC_out),
-        .out  (alloc_in[0])
-    );
+        //----------------------------
+        // Pipeline Register: DEC -> ROB
+        //----------------------------
+        PIPELINE_REG PIPELINE_REG_DEC_ROB(
+            .clk  (clk),
+            .rst_n(rst_n),
+            .stall(stall_dec_rob),
+            .flush(flush_dec_rob),
+            .in   (DEC_out[k]),
+            .out  (alloc_in[k])
+        );
+    end
+    endgenerate
     
     PIPELINE_REG PIPELINE_REG_ROB_EX(
         .clk  (clk),
@@ -150,7 +155,6 @@ module RV32TOP(
     //----------------------------
     RV32EX u_EX(
         .dec_in (EX_in),
-        .ocu    (ocu),
         .ex_out (EX_out)
     );
 

@@ -6,7 +6,6 @@
 
 module RV32EX(
     input  pipe_t dec_in,   // from DEC stage
-    input  [31:0] ocu,      // for CU compatibility (not used inside EX)
     output pipe_t ex_out    // to MEM stage
     );
 

@@ -297,14 +297,72 @@ pipe_t rob_issue   [ROB_SIZE-1:0];
 pipe_t rob_submit  [ROB_SIZE-1:0];
 pipe_t rob_alloc   [ROB_SIZE-1:0];
 pipe_t rob_recieve [ROB_SIZE-1:0];
+reg[ROB_SIZE-1:0] self_alloc  ;
+reg[ROB_SIZE-1:0] self_issue  ;
+reg[ROB_SIZE-1:0] self_recieve;
+reg[ROB_SIZE-1:0] self_submit ;
+always @(*)begin
+    for(integer j = 0; j < ROB_SIZE; j++)begin
+         self_alloc[j] <= 0;
+         rob_alloc[j] <= 0;
+    end
+    for(integer j = 0; j < ENTRY; j++)begin
+         self_alloc[alloc_id[j]] <= alloc_do[j];
+         rob_alloc[alloc_id[j]] <= alloc_in[j];
+    end
+end
+always @(*)begin
+    if(issue_do) begin
+        self_issue <= 1 << issue_id;
+    end else begin
+        self_issue <= 0;
+    end
+    
+    /*for(integer j = 0; j < ROB_SIZE; j++)begin
+         self_issue[j] <= 0;
+    end
+    //for(integer j = 0; j < ENTRY; j++)begin
+         self_issue[issue_id] <= issue_do;
+    //end*/
+end
+always @(*)begin
+    if(recieve_do) begin
+        self_recieve <= 1 << recieve_id;
+    end else begin
+        self_recieve <= 0;
+        
+    for(integer j = 0; j < ROB_SIZE; j++)begin
+         //self_recieve[j] <= 0;
+         rob_recieve[j] <= 0;
+    end
+    //for(integer j = 0; j < ENTRY; j++)begin
+         //self_recieve[recieve_id] <= recieve_do;
+         rob_recieve[recieve_id] <= recieve_in;
+    //end
+end
+always @(*)begin
+    /*for(integer j = 0; j < ROB_SIZE; j++)begin
+         self_submit[j] <= rob_flush;
+    end
+    //for(integer j = 0; j < ENTRY; j++)begin
+         self_submit[submit_id] <= submit_do || rob_flush;
+    //end*/
+    if(rob_flush)begin
+        self_submit <= ~(0);
+    end else if(submit_do) begin
+        self_submit <= 1 << submit_id;
+    end else begin
+        self_submit <= 0;
+    end
+    
+end
+
 generate
 for(genvar i = 0; i < ROB_SIZE; i++)begin
-    wire self_alloc     = alloc_do[0] && (alloc_id[0] == i);
-    wire self_issue     = issue_do && (issue_id == i);
-    wire self_recieve   = recieve_do && (recieve_id == i);
-    wire self_submit    = (submit_do && (submit_id == i)) || rob_flush;
-    assign rob_alloc[i]   = (self_alloc)? alloc_in[0] : '0;
-    assign rob_recieve[i] = (self_recieve)? recieve_in : '0;
+    //assign self_issue  [i]   = issue_do && (issue_id == i);
+    //assign self_recieve[i]   = recieve_do && (recieve_id == i);
+    //assign self_submit [i]   = (submit_do && (submit_id == i)) || rob_flush;
+    //assign rob_recieve[i] = (self_recieve)? recieve_in : '0;
     rob_entry rob_entry_u( 
         .clk       (clk           ),
         .rst_n     (rst_n         ),
@@ -312,10 +370,10 @@ for(genvar i = 0; i < ROB_SIZE; i++)begin
         .recieve_in(rob_recieve[i]),
         .issue_out (rob_issue[i]  ),
         .submit_out(rob_submit[i] ),
-        .alloc     (self_alloc    ),
-        .issue     (self_issue    ),
-        .recieve   (self_recieve  ),
-        .submit    (self_submit   ),
+        .alloc     (self_alloc  [i]),
+        .issue     (self_issue  [i]),
+        .recieve   (self_recieve[i]),
+        .submit    (self_submit [i]),
         .issued    (issued[i]     ),
         .recieved  (recieved[i]   )
     );
