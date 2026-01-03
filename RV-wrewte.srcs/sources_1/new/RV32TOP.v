@@ -15,6 +15,7 @@ module RV32TOP(
     output        out_en
 );
     parameter FETCH_NUM = 2;
+    parameter ISSUE_NUM = 2;
 
     //----------------------------
     // Pipeline wires between stages
@@ -22,17 +23,17 @@ module RV32TOP(
     pipe_t FETCH_out[FETCH_NUM - 1:0];
     pipe_t DEC_in[FETCH_NUM - 1:0];
     pipe_t DEC_out[FETCH_NUM - 1:0];
-    pipe_t EX_in;
-    pipe_t EX_out;
-    pipe_t MEM_in;
-    pipe_t MEM_out;
-    pipe_t WB_in;
+    pipe_t EX_in  [ISSUE_NUM-1:0];
+    pipe_t EX_out [ISSUE_NUM-1:0];
+    pipe_t MEM_in [1-1:0];
+    pipe_t MEM_out[1-1:0];
+    pipe_t WB_in  [ISSUE_NUM-1:0];
 
     //----------------------------
     // Control Unit signals
     //----------------------------
-    wire stall_if_dec, stall_dec_rob, stall_rob_ex, stall_ex_mem, stall_mem_wb;
-    wire flush_if_dec, flush_dec_rob, flush_rob_ex, flush_ex_mem, flush_mem_wb;
+    wire stall_frontend, stall_backend;
+    wire flush_frontend, flush_backend;
     wire en_PC;
     
     wire redirect_valid ;
@@ -43,8 +44,8 @@ module RV32TOP(
     
     pipe_t      alloc_in[FETCH_NUM - 1:0]     ;
     wire        rob_alloc_ready   ;
-    pipe_t      issue_out        ;
-    pipe_t      recieve_in       ;
+    pipe_t      issue_out[ISSUE_NUM - 1:0]        ;
+    pipe_t      recieve_in[ISSUE_NUM - 1:0]       ;
     
     assign recieve_in = WB_in;
     //----------------------------
@@ -52,7 +53,10 @@ module RV32TOP(
     //----------------------------
     
     
-    rob#(.ENTRY(FETCH_NUM)) rob_u(
+    rob#(
+        .ENTRY(FETCH_NUM),
+        .ISSUE(ISSUE_NUM)
+    ) rob_u(
         .clk              (clk              ),
         .rst_n            (rst_n            ),
         .alloc_in         (alloc_in         ),
@@ -73,16 +77,10 @@ module RV32TOP(
         .rob_alloc_ready(rob_alloc_ready),
         .rob_flush      (rob_flush      ),
         .rob_new_pc     (rob_new_pc     ),
-        .stall_if_dec   (stall_if_dec   ),
-        .stall_dec_rob  (stall_dec_rob  ),
-        .stall_rob_ex   (stall_rob_ex   ),
-        .stall_ex_mem   (stall_ex_mem   ),
-        .stall_mem_wb   (stall_mem_wb   ),
-        .flush_if_dec   (flush_if_dec   ),
-        .flush_dec_rob  (flush_dec_rob  ),
-        .flush_rob_ex   (flush_rob_ex   ),
-        .flush_ex_mem   (flush_ex_mem   ),
-        .flush_mem_wb   (flush_mem_wb   ),
+        .stall_frontend (stall_frontend ),
+        .stall_backend  (stall_backend  ),
+        .flush_frontend (flush_frontend ),
+        .flush_backend  (flush_backend  ),
         .redirect_valid (redirect_valid ),
         .redirect_pc    (redirect_pc    ),
         .en_pc          (en_PC          )
@@ -110,8 +108,8 @@ module RV32TOP(
         PIPELINE_REG PIPELINE_REG_FETCH_DEC(
             .clk  (clk),
             .rst_n(rst_n),
-            .stall(stall_if_dec),
-            .flush(flush_if_dec),
+            .stall(stall_frontend),
+            .flush(flush_frontend),
             .in   (FETCH_out[k]),
             .out  (DEC_in[k])
         );
@@ -133,41 +131,43 @@ module RV32TOP(
         PIPELINE_REG PIPELINE_REG_DEC_ROB(
             .clk  (clk),
             .rst_n(rst_n),
-            .stall(stall_dec_rob),
-            .flush(flush_dec_rob),
+            .stall(stall_frontend),
+            .flush(flush_frontend),
             .in   (DEC_out[k]),
             .out  (alloc_in[k])
         );
     end
     endgenerate
     
-    PIPELINE_REG PIPELINE_REG_ROB_EX(
+    //pipeline with LSU
+    
+    PIPELINE_REG PIPELINE_REG_ROB_EX_0(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_rob_ex),
-        .flush(flush_rob_ex),
-        .in   (issue_out),
-        .out  (EX_in)
+        .stall(stall_backend),
+        .flush(flush_backend),
+        .in   (issue_out[0]),
+        .out  (EX_in[0])
     );
     
     //----------------------------
     // EX stage
     //----------------------------
-    RV32EX u_EX(
-        .dec_in (EX_in),
-        .ex_out (EX_out)
+    RV32EX u_EX_0(
+        .dec_in (EX_in[0]),
+        .ex_out (EX_out[0])
     );
 
     //----------------------------
     // Pipeline Register: EX -> MEM
     //----------------------------
-    PIPELINE_REG PIPELINE_REG_EX_MEM(
+    PIPELINE_REG PIPELINE_REG_EX_MEM_0(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_ex_mem),
-        .flush(flush_ex_mem),
-        .in   (EX_out),
-        .out  (MEM_in)
+        .stall(stall_backend),
+        .flush(flush_backend),
+        .in   (EX_out[0]),
+        .out  (MEM_in[0])
     );
 
     //----------------------------
@@ -182,15 +182,15 @@ module RV32TOP(
     //----------------------------
     // MEM stage
     //----------------------------
-    RV32MEM u_MEM(
-        .ex_in (MEM_in),
+    RV32MEM u_MEM_0(
+        .ex_in (MEM_in[0]),
         .Load  (Load),
         .Store (Store),
         .addr  (bus_addr),
         .data  (bus_data_out),
         .width (bus_width),
         .D_data(bus_data_in),
-        .mem_out(MEM_out)
+        .mem_out(MEM_out[0])
     );
     
     
@@ -213,36 +213,49 @@ module RV32TOP(
     //----------------------------
     // Pipeline Register: MEM -> WB
     //----------------------------
-    PIPELINE_REG PIPELINE_REG_MEM_WB(
+    PIPELINE_REG PIPELINE_REG_MEM_WB_0(
         .clk  (clk),
         .rst_n(rst_n),
-        .stall(stall_mem_wb),
-        .flush(flush_mem_wb),
-        .in   (MEM_out),
-        .out  (WB_in)
+        .stall(stall_backend),
+        .flush(flush_backend),
+        .in   (MEM_out[0]),
+        .out  (WB_in[0])
+    );
+    ////////////////////////////////////////
+    
+    // pipelines without LSU
+    generate
+    for(k = 1; k < ISSUE_NUM; k = k + 1)begin
+    PIPELINE_REG PIPELINE_REG_ROB_EX(
+        .clk  (clk),
+        .rst_n(rst_n),
+        .stall(stall_backend),
+        .flush(flush_backend),
+        .in   (issue_out[k]),
+        .out  (EX_in[k])
+    );
+    
+    //----------------------------
+    // EX stage
+    //----------------------------
+    RV32EX u_EX(
+        .dec_in (EX_in[k]),
+        .ex_out (EX_out[k])
     );
 
     //----------------------------
-    // WB stage
+    // Pipeline Register: EX -> WB
     //----------------------------
-    //RV32WB u_WB(
-    //    .mem_in (WB_in),
-    //    .rdaddr (wb_rdaddr),
-    //    .rd     (wb_rddata),
-    //    .jump   (wb_jump),
-    //    .pc_out (wb_pc)
-    //);
-
-    
-    
-
-
-    //----------------------------
-    // output mapping (your style)
-    //----------------------------
-    //assign in_en  = 1'b1;
-    //assign out    = wb_rddata;
-    //assign out_en = 1'b1;
+    PIPELINE_REG PIPELINE_REG_EX_WB(
+        .clk  (clk),
+        .rst_n(rst_n),
+        .stall(stall_backend),
+        .flush(flush_backend),
+        .in   (EX_out[k]),
+        .out  (WB_in[k])
+    );
+    end
+    endgenerate 
 
 endmodule
 //ENDFILE RV32TOP.v

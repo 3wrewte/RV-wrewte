@@ -22,16 +22,18 @@
 
 
 module registers32 #(
-    parameter depth = 5
+    parameter depth = 5,
+    parameter read_channel = 1,
+    parameter write_channel = 1
 )(
     input                    clk   ,
     input                    rst_n ,
-    input [depth - 1:0]      r1addr,
-    input [depth - 1:0]      r2addr,
-    input [depth - 1:0]      waddr ,
-    output[31:0]             rdata1,
-    output[31:0]             rdata2,
-    input [31:0]             wdata
+    input [depth - 1:0]      r1addr[read_channel-1:0],
+    input [depth - 1:0]      r2addr[read_channel-1:0],
+    input [depth - 1:0]      waddr[write_channel-1:0],
+    output[31:0]             rdata1[read_channel-1:0],
+    output[31:0]             rdata2[read_channel-1:0],
+    input [31:0]             wdata[write_channel-1:0]
     );
   reg [31:0] registers [0:(1 << depth) - 1]; // 32 个 32 位寄存器
   //reg [depth - 1:0] cnt;
@@ -45,18 +47,22 @@ module registers32 #(
           //    cnt = cnt + 1;
           //end
           for(i = 0; i < (1 << depth); i= i + 1)begin
-              registers[i] <= 0;
+              registers[i] = 0;
           end
       end else begin
-          if(waddr != 0)
-              registers[waddr] <= wdata;
-          else;
+          for(i = 0; i < write_channel; i= i + 1)begin
+            if(waddr[i] != 0)
+                registers[waddr[i]] = wdata[i];
+          end
       end
   end
-
-  assign rdata1 = registers[r1addr];
-  assign rdata2 = registers[r2addr];
-
+  
+  generate
+    for(genvar k = 0; k < read_channel; k= k + 1)begin
+        assign rdata1[k] = registers[r1addr[k]];
+        assign rdata2[k] = registers[r2addr[k]];
+    end
+  endgenerate
 endmodule
 
 
