@@ -45,9 +45,9 @@ module RV32TOP(
     pipe_t      alloc_in[FETCH_NUM - 1:0]     ;
     wire        rob_alloc_ready   ;
     pipe_t      issue_out[ISSUE_NUM - 1:0]        ;
-    pipe_t      recieve_in[ISSUE_NUM - 1:0]       ;
+    pipe_t      receive_in[ISSUE_NUM - 1:0]       ;
     
-    assign recieve_in = WB_in;
+    assign receive_in = WB_in;
     //----------------------------
     // rob
     //----------------------------
@@ -62,7 +62,7 @@ module RV32TOP(
         .alloc_in         (alloc_in         ),
         .rob_alloc_ready  (rob_alloc_ready  ),
         .issue_out        (issue_out        ),
-        .recieve_in       (recieve_in       ),
+        .receive_in       (receive_in       ),
         .rob_flush        (rob_flush        ),
         .rob_new_pc       (rob_new_pc       ) 
     );

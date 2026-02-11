@@ -6,16 +6,16 @@ module rob_entry(
     input clk  ,
     input rst_n,
     input pipe_t  alloc_in  ,
-    input pipe_t  recieve_in,
+    input pipe_t  receive_in,
     //input pipe_t  issue_out ,
     //input pipe_t  submit_out,
     output pipe_t value     ,
     input         alloc     ,
     input         issue     ,
-    input         recieve   ,
+    input         receive   ,
     input         submit    ,
     output  reg   issued    ,
-    output  reg   recieved
+    output  reg   received
     );
     
     always_ff @(posedge clk or negedge rst_n) begin
@@ -56,10 +56,10 @@ module rob_entry(
             value.result <= '0;
             value.taddr  <= '0;
             value.jump   <= '0;
-        end else if (recieve)begin
-            value.result <= recieve_in.result;
-            value.taddr  <= recieve_in.taddr ;
-            value.jump   <= recieve_in.jump  ;
+        end else if (receive)begin
+            value.result <= receive_in.result;
+            value.taddr  <= receive_in.taddr ;
+            value.jump   <= receive_in.jump  ;
         end else begin
             value.result <= value.result;
             value.taddr  <= value.taddr ;
@@ -110,13 +110,13 @@ module rob_entry(
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n | submit | alloc)begin
             issued   <= '0;
-            recieved <= '0;
+            received <= '0;
         end else if(issue)begin
             issued   <= '1;
-            recieved <= '0;
-        end else if(recieve)begin
+            received <= '0;
+        end else if(receive)begin
             issued   <= '1;
-            recieved <= '1;
+            received <= '1;
         end
     end
 endmodule
@@ -148,7 +148,7 @@ module rob #(
     //output reg                 issue_found,
 
     // ---------- writeback ----------
-    input  pipe_t              recieve_in[ISSUE-1:0],
+    input  pipe_t              receive_in[ISSUE-1:0],
 
     // ---------- commit ----------
 
@@ -287,19 +287,19 @@ endgenerate
 // End Issue
 
 // Recieve
-wire[ISSUE-1:0] recieve_do;
-wire [ROB_BITS-1:0] recieve_id[ISSUE-1:0];
+wire[ISSUE-1:0] receive_do;
+wire [ROB_BITS-1:0] receive_id[ISSUE-1:0];
 generate
 for(genvar k = 0; k < ISSUE; k++) begin
-    assign recieve_do[k] = recieve_in[k].valid ;
-    assign recieve_id[k] = recieve_in[k].rob_id;
+    assign receive_do[k] = receive_in[k].valid ;
+    assign receive_id[k] = receive_in[k].rob_id;
 end
 endgenerate
 // End Recieve
 
 // Submit
-wire [ROB_SIZE-1:0] recieved    ;
-wire submit_do = recieved[head];
+wire [ROB_SIZE-1:0] received    ;
+wire submit_do = received[head];
 wire [ROB_BITS-1:0] submit_id = submit_do? head : '0;
 //End Submit
 
@@ -331,10 +331,10 @@ registers32#(
 // ROB Entries
 pipe_t rob_stored_value  [ROB_SIZE-1:0];
 pipe_t rob_alloc   [ROB_SIZE-1:0];
-pipe_t rob_recieve [ROB_SIZE-1:0];
+pipe_t rob_receive [ROB_SIZE-1:0];
 reg[ROB_SIZE-1:0] self_alloc  ;
 reg[ROB_SIZE-1:0] self_issue  ;
-reg[ROB_SIZE-1:0] self_recieve;
+reg[ROB_SIZE-1:0] self_receive;
 reg[ROB_SIZE-1:0] self_submit ;
 always @(*)begin
     for(integer j = 0; j < ROB_SIZE; j++)begin
@@ -361,18 +361,18 @@ always @(*)begin
     end
 end
 always @(*)begin
-    /*if(recieve_do) begin
-        self_recieve <= 1 << recieve_id;
+    /*if(receive_do) begin
+        self_receive <= 1 << receive_id;
     end else begin
-        self_recieve <= 0;*/
+        self_receive <= 0;*/
         
     for(integer j = 0; j < ROB_SIZE; j++)begin
-         self_recieve[j] = 0;
-         rob_recieve[j] = 0;
+         self_receive[j] = 0;
+         rob_receive[j] = 0;
     end
     for(integer j = 0; j < ISSUE; j++)begin
-         self_recieve[recieve_id[j]] = recieve_do[j]? 1'b1 : self_recieve[recieve_id[j]];
-         rob_recieve[recieve_id[j]] =  recieve_do[j]? recieve_in[j] : rob_recieve[recieve_id[j]];
+         self_receive[receive_id[j]] = receive_do[j]? 1'b1 : self_receive[receive_id[j]];
+         rob_receive[receive_id[j]] =  receive_do[j]? receive_in[j] : rob_receive[receive_id[j]];
     end
 end
 
@@ -396,21 +396,21 @@ end
 generate
 for(genvar i = 0; i < ROB_SIZE; i++)begin
     //assign self_issue  [i]   = issue_do && (issue_id == i);
-    //assign self_recieve[i]   = recieve_do && (recieve_id == i);
+    //assign self_receive[i]   = receive_do && (receive_id == i);
     //assign self_submit [i]   = (submit_do && (submit_id == i)) || rob_flush;
-    //assign rob_recieve[i] = (self_recieve)? recieve_in : '0;
+    //assign rob_receive[i] = (self_receive)? receive_in : '0;
     rob_entry rob_entry_u( 
         .clk       (clk                ),
         .rst_n     (rst_n              ),
         .alloc_in  (rob_alloc[i]       ),
-        .recieve_in(rob_recieve[i]     ),
+        .receive_in(rob_receive[i]     ),
         .value     (rob_stored_value[i]),
         .alloc     (self_alloc      [i]),
         .issue     (self_issue      [i]),
-        .recieve   (self_recieve    [i]),
+        .receive   (self_receive    [i]),
         .submit    (self_submit     [i]),
         .issued    (issued[i]          ),
-        .recieved  (recieved[i]        )
+        .received  (received[i]        )
     );
     assign rs1  [i] = rob_stored_value[i].rs1_addr  ; 
     assign rs2  [i] = rob_stored_value[i].rs2_addr  ;
