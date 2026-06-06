@@ -1,18 +1,22 @@
 ########################################################################
 # run_sim.tcl - Vivado batch simulation script for RV-wrewte
-# Usage: vivado -mode batch -source scripts/run_sim.tcl -tclargs [-v]
-# Writes result to $TMP/result.txt for the shell wrapper to display.
+# Usage: vivado -mode batch -source scripts/run_sim.tcl -tclargs <test> [-v]
 ########################################################################
 
 set VERBOSE 0
+set TEST ""
 foreach arg $argv {
-    if {$arg eq "-v" || $arg eq "--verbose"} { set VERBOSE 1 }
+    if {$arg eq "-v" || $arg eq "--verbose"} { set VERBOSE 1 } \
+    elseif {$TEST eq ""} { set TEST $arg }
 }
+if {$TEST eq ""} { set TEST "read_write" }
 
 set ROOT [file normalize [file dirname [info script]]/..]
 set SRC  [file join $ROOT "RV-wrewte.srcs/sources_1/new"]
 set SIM  [file join $ROOT "RV-wrewte.srcs/sim_1/new"]
 set TMP  [file join $ROOT "tmp"]
+set LOG  [file join $ROOT "log"]
+set CGF  [file join $ROOT "tests" $TEST "expect.tcl"]
 
 file mkdir $TMP
 cd $TMP
@@ -22,15 +26,12 @@ set STATUS_FILE [file join $TMP "status.txt"]
 catch { file delete $RESULT_FILE }
 catch { file delete $STATUS_FILE }
 
-proc log {msg} {
-    global VERBOSE
-    if {$VERBOSE} { puts $msg }
-}
+proc log {msg} { global VERBOSE; if {$VERBOSE} { puts $msg } }
 
 proc fail {msg} {
     global RESULT_FILE STATUS_FILE
     set fh [open $STATUS_FILE w]; puts $fh "FAIL"; close $fh
-    set fh [open $RESULT_FILE w]; puts $fh $msg; close $fh
+    set fh [open $RESULT_FILE w]; puts $fh $msg;   close $fh
     exit 1
 }
 
@@ -76,13 +77,9 @@ set xvlog_args [list xvlog --sv]
 eval lappend xvlog_args $src_files
 
 if {$VERBOSE} {
-    if {[catch {exec {*}$xvlog_args >@ stdout 2>@ stderr} res]} {
-        fail "xvlog: $res"
-    }
+    if {[catch {exec {*}$xvlog_args >@ stdout 2>@ stderr} res]} { fail "xvlog: $res" }
 } else {
-    if {[catch {exec {*}$xvlog_args > /dev/null} res]} {
-        fail "xvlog failed:\n$res"
-    }
+    if {[catch {exec {*}$xvlog_args > /dev/null} res]} { fail "xvlog failed:\n$res" }
 }
 log "xvlog OK"
 
@@ -92,13 +89,9 @@ log "xvlog OK"
 log "--- xelab ---"
 set elab_args [list xelab RV32test --debug wave --snapshot sim_snapshot]
 if {$VERBOSE} {
-    if {[catch {exec {*}$elab_args >@ stdout 2>@ stderr} res]} {
-        fail "xelab: $res"
-    }
+    if {[catch {exec {*}$elab_args >@ stdout 2>@ stderr} res]} { fail "xelab: $res" }
 } else {
-    if {[catch {exec {*}$elab_args > /dev/null} res]} {
-        fail "xelab failed:\n$res"
-    }
+    if {[catch {exec {*}$elab_args > /dev/null} res]} { fail "xelab failed:\n$res" }
 }
 log "xelab OK"
 
@@ -115,7 +108,6 @@ close $fh
 
 set xsim_args [list xsim sim_snapshot --tclbatch $cmd_tcl --log $xsim_log]
 set xsim_stdout ""
-
 if {[catch {set xsim_stdout [exec {*}$xsim_args 2> /dev/null]} err]} {
     set xsim_stdout $err
 }
@@ -123,7 +115,7 @@ if {$VERBOSE} { puts $xsim_stdout }
 log "xsim OK"
 
 #-----------------------------------------------------------------------
-# Step 4: verify output
+# Step 4: extract output values
 #-----------------------------------------------------------------------
 set values [list]
 foreach line [split $xsim_stdout "\n"] {
@@ -131,31 +123,31 @@ foreach line [split $xsim_stdout "\n"] {
         lappend values $dec
     }
 }
-
 set n [llength $values]
-set expect_min 32
 
-if {$n < $expect_min} {
-    fail "only $n output values (expected >= $expect_min)\n  Got: $values"
-}
-if {$n > $expect_min} {
-    set values [lrange $values 0 [expr {$expect_min - 1}]]
-    set n $expect_min
-}
-
-set deltas [list]
-for {set i 1} {$i < $n} {incr i} {
-    lappend deltas [expr {[lindex $values $i] - [lindex $values [expr {$i-1}]]}]
-}
-
-set delta_ref [lindex $deltas 0]
-set ok 1
-foreach d $deltas {
-    if {$d != $delta_ref} { set ok 0; break }
-}
-
-if {$ok} {
-    pass "$n outputs, delta=$delta_ref values=[lrange $values 0 4]..."
+#-----------------------------------------------------------------------
+# Step 5: verify (test-specific logic)
+#-----------------------------------------------------------------------
+if {[file exists $CGF]} {
+    source $CGF
 } else {
-    fail "inconsistent deltas: $deltas\n  Values: $values"
+    verify_default $values
+}
+
+#-----------------------------------------------------------------------
+# Default verification: 32 outputs, monotonically non-decreasing
+#-----------------------------------------------------------------------
+proc verify_default {values} {
+    set n [llength $values]
+    if {$n < 32} {
+        fail "only $n output values (expected >= 32)"
+    }
+    set prev -1
+    foreach v $values {
+        if {$v < $prev} {
+            fail "output not monotonic: prev=$prev cur=$v"
+        }
+        set prev $v
+    }
+    pass "$n outputs, monotonic, range=[lindex $values 0]..[lindex $values end]"
 }

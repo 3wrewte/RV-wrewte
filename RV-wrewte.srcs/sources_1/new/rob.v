@@ -130,8 +130,8 @@ module rob #(
     parameter ROB_BITS = $clog2(ROB_SIZE),
     parameter ENTRY = 1,
     parameter ENTRY_BITS = $clog2(ENTRY),
-    parameter ISSUE = 1,
-    parameter ISSUE_BITS = $clog2(ISSUE),
+    parameter ISSUE_LSU = 1,
+    parameter ISSUE_ALU = 1,
     parameter SUBMIT = 1,
     parameter SUBMIT_BITS = $clog2(SUBMIT)
 )(
@@ -140,22 +140,23 @@ module rob #(
 
     // ---------- allocate from DEC ----------
     input  pipe_t              alloc_in[ENTRY-1:0],
-    //input  pipe_t              alloc1,
     output                     rob_alloc_ready,
 
     // ---------- issue (to backend) ----------
-    output pipe_t              issue_out[ISSUE-1:0],
-    //output reg                 issue_found,
+    // issue_out[0 .. ISSUE_LSU-1]          = LSU ports (load/store only)
+    // issue_out[ISSUE_LSU .. ISSUE-1]      = ALU ports (non-LS)
+    output pipe_t              issue_out[ISSUE_LSU + ISSUE_ALU - 1:0],
 
     // ---------- writeback ----------
-    input  pipe_t              receive_in[ISSUE-1:0],
-
-    // ---------- commit ----------
+    input  pipe_t              receive_in[ISSUE_LSU + ISSUE_ALU - 1:0],
 
     // ---------- flush output ----------
     output reg                 rob_flush,
     output reg [31:0]          rob_new_pc
 );
+
+localparam ISSUE = ISSUE_LSU + ISSUE_ALU;
+localparam ISSUE_BITS = $clog2(ISSUE);
 
 // ===========================================================
 // Local storage
@@ -164,12 +165,9 @@ reg [ROB_BITS-1:0] head;
 reg [ROB_BITS-1:0] tail;
 
 // Allocate
-wire alloc_ready;
+reg [ROB_BITS:0] rob_count;
+wire alloc_ready = (rob_count + ENTRY <= ROB_SIZE);
 assign rob_alloc_ready = alloc_ready;
-wire [ROB_BITS-1:0] space_left;
-//assign space_left = {head - tail}[ROB_BITS-1:0];
-assign space_left = head - tail - 1;
-assign alloc_ready = (space_left >= ENTRY);
 wire [ROB_BITS-1:0]   alloc_id[ENTRY-1:0];
 wire                  alloc_do[ENTRY-1:0];
 wire [ROB_BITS-1:0] alloc_amount;
@@ -236,13 +234,13 @@ wire [32-1:0] rs_one_hot [ROB_SIZE-1:0];
 wire [32-1:0] rd_one_hot [ROB_SIZE-1:0];
 wire [32-1:0] occupied [ROB_SIZE-1:0];
 wire [ROB_SIZE-1:0] conflict_n;
-wire [ROB_SIZE-1:0] LoadStore;
+wire [ROB_SIZE-1:0] is_lsu;
 wire [ROB_SIZE-1:0] ready;
 generate
 for(genvar i = 0; i < ROB_SIZE; i++) begin
     assign rs_one_hot[i] = (1 << rs1_realloc[i]) | (1 << rs2_realloc[i]);
     assign rd_one_hot[i] = (1 << rd_realloc[i]) & (~32'b1);
-    assign LoadStore = (opcode_realloc[i] == 7'b0000011) || (opcode_realloc[i] == 7'b0100011);
+    assign is_lsu[i] = (opcode_realloc[i] == 7'b0000011) || (opcode_realloc[i] == 7'b0100011);
 end
 endgenerate
 assign occupied[0] = rd_one_hot[0];
@@ -258,23 +256,27 @@ for(genvar i = 0; i < ROB_SIZE; i++) begin
     assign ready[i] = conflict_n[i] & (!issued_realloc[i]) & valid_realloc[i];
 end
 endgenerate
-wire [ROB_SIZE-1:0] ready_LS = ready & LoadStore;
-wire [ROB_SIZE-1:0] ready_ALU = ready & ~LoadStore;
-wire [ROB_SIZE-1:0] avail [ISSUE:0];
 
+//-----------------------------------------------------------------------
+// Issue: chained priority across all ports
+// Lane 0 gets first pick from ALL ready; lane N gets remainder minus LSU
+// This ensures LSU ops can go to lane 0 (LS path) while lane 1+ gets ALU
+//-----------------------------------------------------------------------
+wire [ROB_SIZE-1:0] avail [ISSUE:0];
 assign avail[0] = ready;
+
 wire [ISSUE-1:0] issue_do;
 wire [ROB_BITS-1:0] issue_id_realloc [ISSUE-1:0];
+
 generate
 for(genvar k = 0; k < ISSUE; k++) begin
     wire [ROB_BITS-1:0] id;
-    LSB#(.WIDTH(ROB_BITS)) enc_issue(
-        .in(avail[k]),
-        .out(id)
-    );
+    LSB#(.WIDTH(ROB_BITS)) enc_issue(.in(avail[k]), .out(id));
     assign issue_do[k] = |avail[k];
     wire [ROB_SIZE-1:0] mask = issue_do[k] ? (1'b1 << id) : '0;
-    assign avail[k+1] = (k==0)? avail[k] & ~mask & ~LoadStore : avail[k] & ~mask;
+    assign avail[k+1] = (k == 0)
+        ? avail[k] & ~mask & ~is_lsu   // lane 0: remove pick + all LSU (for lane 1+)
+        : avail[k] & ~mask;            // lane 1+: only remove pick
     assign issue_id_realloc[k] = id;
 end
 endgenerate
@@ -461,11 +463,11 @@ always @(posedge clk or negedge rst_n) begin
         if (!rst_n | rob_flush)begin
             head <= '0;
             tail <= '0;
+            rob_count <= '0;
         end else begin
-            //head <= {head + alloc_amount}[ROB_BITS-1:0];
-            //tail <= {tail + submit_do}[ROB_BITS-1:0];
             head <= head + submit_do; 
-            tail <= tail + alloc_amount;    
+            tail <= tail + alloc_amount;
+            rob_count <= rob_count + alloc_amount - submit_do;
         end
     end
 // End Queue Ctl
