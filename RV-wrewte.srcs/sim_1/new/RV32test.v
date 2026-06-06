@@ -34,6 +34,12 @@ module RV32test(
     end
     always #50 sys_clk = ~sys_clk;
     
+    initial begin
+        #1000000;
+        $display("Simulation timeout at %t", $time);
+        $finish;
+    end
+    
     reg  [31:0]   in    ;
     wire          in_en ;
     always @(posedge sys_clk or negedge sys_rst_n)begin
@@ -41,6 +47,15 @@ module RV32test(
             in <= 32'b0;
         else 
             in <= in + 1;
+    end
+    
+    integer out_cnt;
+    initial out_cnt = 0;
+    always @(posedge sys_clk) begin
+        if (out_en) begin
+            out_cnt = out_cnt + 1;
+            $display("[%t] out=0x%h (%0d), cnt=%0d", $time, out, out, out_cnt);
+        end
     end
     
     

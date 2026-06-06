@@ -3,3 +3,10 @@ RV-wrewte.runs/
 RV-wrewte.ip_user_files/
 RV-wrewte.hw/
 RV-wrewte.cache/
+reference/
+
+tmp/
+build/
+log/
+
+xelab.pb

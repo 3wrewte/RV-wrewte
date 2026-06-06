@@ -43,7 +43,6 @@ module RV32TOP(
     wire [31:0] rob_new_pc     ;
     
     pipe_t      alloc_in[FETCH_NUM - 1:0]     ;
-    wire        rob_alloc_ready   ;
     pipe_t      issue_out[ISSUE_NUM - 1:0]        ;
     pipe_t      receive_in[ISSUE_NUM - 1:0]       ;
     

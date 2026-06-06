@@ -58,7 +58,7 @@ module RAM32 #(
     wire [63:0] selected_word = double_word >> {addr[1:0], 3'b0}; 
     wire [31:0] word      = selected_word[31:0];
     wire [15:0] half_word = selected_word[15:0];
-    wire [ 7:0] byte      = selected_word[7:0];
+    wire [ 7:0] byte_val  = selected_word[7:0];
     
     reg [31:0] mask;
     always @(*)begin
@@ -94,10 +94,10 @@ module RAM32 #(
     always @(*)begin
         if(read) begin
             case(width)
-                3'b000:  rdata <= {{24{byte[7]}},byte[7:0]};  
-                3'b001:  rdata <= {{16{byte[7]}},half_word[15:0]};
+                3'b000:  rdata <= {{24{byte_val[7]}},byte_val[7:0]};
+                3'b001:  rdata <= {{16{byte_val[7]}},half_word[15:0]};
                 3'b010:  rdata <= word;
-                3'b100:  rdata <= {24'b0,byte[7:0]};
+                3'b100:  rdata <= {24'b0,byte_val[7:0]};
                 3'b101:  rdata <= {16'b0,half_word[15:0]};
                 default: rdata <= 32'b0; 
             endcase
