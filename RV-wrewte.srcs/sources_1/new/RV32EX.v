@@ -89,6 +89,8 @@ module RV32EX(
     assign ex_out.taddr     = taddr;
     assign ex_out.jump      = jump;
     assign ex_out.valid     = dec_in.valid;
+    assign ex_out.pred_taken = dec_in.pred_taken;
+    assign ex_out.pred_pc   = dec_in.pred_pc;
     //assign ex_out.valid     = branch | jal | jalr | dec_in.valid; // mark special/valid
 
 endmodule

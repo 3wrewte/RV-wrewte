@@ -5,22 +5,24 @@
 
 
 typedef struct packed {
-    logic [31:0] rob_id  ;
-    logic [31:0] instr   ;
-    logic [31:0] pc      ;
-    logic [31:0] imm     ;
-    logic [31:0] rs1_data;
-    logic [31:0] rs2_data;
-    logic [4:0]  rs1_addr;
-    logic [4:0]  rs2_addr;
-    logic [4:0]  rd_addr ;
-    logic [6:0]  opcode  ;
-    logic [2:0]  funct3  ;
-    logic [6:0]  funct7  ;
-    logic [31:0] result  ; //alu result
-    logic [31:0] taddr   ; //target mem addr or target PC
-    logic        jump    ;
-    logic        valid   ; //1 if the pipe_t stores a real command 
+    logic [31:0] rob_id     ;
+    logic [31:0] instr      ;
+    logic [31:0] pc         ;
+    logic [31:0] imm        ;
+    logic [31:0] rs1_data   ;
+    logic [31:0] rs2_data   ;
+    logic [4:0]  rs1_addr   ;
+    logic [4:0]  rs2_addr   ;
+    logic [4:0]  rd_addr    ;
+    logic [6:0]  opcode     ;
+    logic [2:0]  funct3     ;
+    logic [6:0]  funct7     ;
+    logic [31:0] result     ; //alu result
+    logic [31:0] taddr      ; //target mem addr or target PC
+    logic        jump       ;
+    logic        valid      ; //1 if the pipe_t stores a real command 
+    logic        pred_taken ; //branch prediction at fetch: 1=taken
+    logic [31:0] pred_pc    ; //predicted next PC after this instr
 } pipe_t;
 
 

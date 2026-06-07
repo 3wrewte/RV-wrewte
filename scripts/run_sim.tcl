@@ -54,6 +54,7 @@ set src_files [list \
     [file join $SRC "registers32.v"] \
     [file join $SRC "RAM32.v"] \
     [file join $SRC "I_Cache.v"] \
+    [file join $SRC "BHT.v"] \
     [file join $SRC "RV32DEC.v"] \
     [file join $SRC "RV32OPDEC.v"] \
     [file join $SRC "RV32COND.v"] \
@@ -67,6 +68,7 @@ set src_files [list \
     [file join $SRC "RV32FETCH.v"] \
     [file join $SRC "RV32DEC_REG.v"] \
     [file join $SRC "RV32EX.v"] \
+    [file join $SRC "RV32EX_BRU.v"] \
     [file join $SRC "RV32MEM.v"] \
     [file join $SRC "RV32WB.v"] \
     [file join $SRC "RV32TOP.v"] \

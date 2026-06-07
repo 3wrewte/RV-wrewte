@@ -52,7 +52,9 @@ module RV32DEC_REG(
     assign dec_out.result    = 32'b0;
     assign dec_out.taddr     = 32'b0;
     assign dec_out.jump      = 1'b0;
-    assign dec_out.valid     = fetch_in.valid; // indicate valid instruction in pipeline
+    assign dec_out.valid     = fetch_in.valid;
+    assign dec_out.pred_taken = fetch_in.pred_taken;
+    assign dec_out.pred_pc   = fetch_in.pred_pc;
 
 
 

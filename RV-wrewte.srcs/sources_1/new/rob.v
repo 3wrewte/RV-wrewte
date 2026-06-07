@@ -29,6 +29,8 @@ module rob_entry(
             value.imm      <= '0;
             value.pc       <= '0;
             value.valid    <= '0;
+            value.pred_taken <= '0;
+            value.pred_pc   <= '0;
         end else if (alloc)begin
             value.opcode   <= alloc_in.opcode  ;
             value.rs1_addr <= alloc_in.rs1_addr;
@@ -39,6 +41,8 @@ module rob_entry(
             value.imm      <= alloc_in.imm     ;
             value.pc       <= alloc_in.pc      ;
             value.valid    <= alloc_in.valid   ;
+            value.pred_taken <= alloc_in.pred_taken;
+            value.pred_pc   <= alloc_in.pred_pc;
         end else begin
             value.opcode   <= value.opcode  ;
             value.rs1_addr <= value.rs1_addr;
@@ -49,6 +53,8 @@ module rob_entry(
             value.imm      <= value.imm     ;
             value.pc       <= value.pc      ;
             value.valid    <= value.valid   ;
+            value.pred_taken <= value.pred_taken;
+            value.pred_pc   <= value.pred_pc;
         end
     end
     always_ff @(posedge clk or negedge rst_n) begin
@@ -132,6 +138,7 @@ module rob #(
     parameter ENTRY_BITS = $clog2(ENTRY),
     parameter ISSUE_LSU = 1,
     parameter ISSUE_ALU = 1,
+    parameter ISSUE_BRU = 0,
     parameter SUBMIT = 1,
     parameter SUBMIT_BITS = $clog2(SUBMIT)
 )(
@@ -143,20 +150,26 @@ module rob #(
     output                     rob_alloc_ready,
 
     // ---------- issue (to backend) ----------
-    // issue_out[0 .. ISSUE_LSU-1]          = LSU ports (load/store only)
-    // issue_out[ISSUE_LSU .. ISSUE-1]      = ALU ports (non-LS)
-    output pipe_t              issue_out[ISSUE_LSU + ISSUE_ALU - 1:0],
+    output pipe_t              issue_out[ISSUE_LSU + ISSUE_ALU + ISSUE_BRU - 1:0],
 
     // ---------- writeback ----------
-    input  pipe_t              receive_in[ISSUE_LSU + ISSUE_ALU - 1:0],
+    input  pipe_t              receive_in[ISSUE_LSU + ISSUE_ALU + ISSUE_BRU - 1:0],
+
+    // ---------- BRU mispredict input ----------
+    input                      br_mispredict,
+    input  [31:0]              br_mispredict_rob_id,
+    input  [31:0]              br_mispredict_target,
 
     // ---------- flush output ----------
     output reg                 rob_flush,
     output reg [31:0]          rob_new_pc
 );
 
-localparam ISSUE = ISSUE_LSU + ISSUE_ALU;
+localparam ISSUE = ISSUE_LSU + ISSUE_ALU + ISSUE_BRU;
 localparam ISSUE_BITS = $clog2(ISSUE);
+localparam IDX_LSU = 0;
+localparam IDX_ALU = ISSUE_LSU;
+localparam IDX_BRU = ISSUE_LSU + ISSUE_ALU;
 
 // ===========================================================
 // Local storage
@@ -235,12 +248,14 @@ wire [32-1:0] rd_one_hot [ROB_SIZE-1:0];
 wire [32-1:0] occupied [ROB_SIZE-1:0];
 wire [ROB_SIZE-1:0] conflict_n;
 wire [ROB_SIZE-1:0] is_lsu;
+wire [ROB_SIZE-1:0] is_branch;
 wire [ROB_SIZE-1:0] ready;
 generate
 for(genvar i = 0; i < ROB_SIZE; i++) begin
     assign rs_one_hot[i] = (1 << rs1_realloc[i]) | (1 << rs2_realloc[i]);
     assign rd_one_hot[i] = (1 << rd_realloc[i]) & (~32'b1);
-    assign is_lsu[i] = (opcode_realloc[i] == 7'b0000011) || (opcode_realloc[i] == 7'b0100011);
+    assign is_lsu[i]    = (opcode_realloc[i] == 7'b0000011) || (opcode_realloc[i] == 7'b0100011);
+    assign is_branch[i] = (opcode_realloc[i] == 7'b1100011) || (opcode_realloc[i] == 7'b1101111) || (opcode_realloc[i] == 7'b1100111);
 end
 endgenerate
 assign occupied[0] = rd_one_hot[0];
@@ -258,28 +273,27 @@ end
 endgenerate
 
 //-----------------------------------------------------------------------
-// Issue: chained priority across all ports
-// Lane 0 gets first pick from ALL ready; lane N gets remainder minus LSU
-// This ensures LSU ops can go to lane 0 (LS path) while lane 1+ gets ALU
+// Issue: cascade (BRU_NUM=0 for now, use cascade for LSU + ALU)
 //-----------------------------------------------------------------------
-wire [ROB_SIZE-1:0] avail [ISSUE:0];
-assign avail[0] = ready;
-
 wire [ISSUE-1:0] issue_do;
 wire [ROB_BITS-1:0] issue_id_realloc [ISSUE-1:0];
 
+wire [ROB_SIZE-1:0] avail [ISSUE:0];
+assign avail[0] = ready;
+
 generate
-for(genvar k = 0; k < ISSUE; k++) begin
+for (genvar k = 0; k < ISSUE; k++) begin
     wire [ROB_BITS-1:0] id;
-    LSB#(.WIDTH(ROB_BITS)) enc_issue(.in(avail[k]), .out(id));
+    LSB#(.WIDTH(ROB_BITS)) enc_iss(.in(avail[k]), .out(id));
     assign issue_do[k] = |avail[k];
     wire [ROB_SIZE-1:0] mask = issue_do[k] ? (1'b1 << id) : '0;
     assign avail[k+1] = (k == 0)
-        ? avail[k] & ~mask & ~is_lsu   // lane 0: remove pick + all LSU (for lane 1+)
-        : avail[k] & ~mask;            // lane 1+: only remove pick
+        ? avail[k] & ~mask & ~is_lsu
+        : avail[k] & ~mask;
     assign issue_id_realloc[k] = id;
 end
 endgenerate
+
 wire [ROB_BITS-1:0] issue_id[ISSUE-1:0];
 generate
 for(genvar k = 0; k < ISSUE; k++) begin
@@ -299,11 +313,13 @@ end
 endgenerate
 // End Recieve
 
-// Submit
-wire [ROB_SIZE-1:0] received    ;
-wire submit_do = received[head];
-wire [ROB_BITS-1:0] submit_id = submit_do? head : '0;
-//End Submit
+ // Submit
+ wire [ROB_SIZE-1:0] received    ;
+ wire submit_do = received[head];
+ //End Submit
+
+wire partial_flush = br_mispredict;
+wire [ROB_BITS-1:0] submit_id = submit_do ? head : '0;
 
 // Registers
 wire [ 5-1:0] rs1_addr[ISSUE-1:0];
@@ -332,6 +348,15 @@ registers32#(
 
 // ROB Entries
 pipe_t rob_stored_value  [ROB_SIZE-1:0];
+
+pipe_t submit_chosen;
+assign submit_chosen = submit_do ? rob_stored_value[submit_id] : '0;
+wire commit_jump = submit_do && submit_chosen.jump;
+
+assign rob_flush  = commit_jump || partial_flush;
+assign rob_new_pc = partial_flush ? br_mispredict_target :
+                    commit_jump  ? submit_chosen.taddr : '0;
+
 pipe_t rob_alloc   [ROB_SIZE-1:0];
 pipe_t rob_receive [ROB_SIZE-1:0];
 reg[ROB_SIZE-1:0] self_alloc  ;
@@ -379,20 +404,24 @@ always @(*)begin
 end
 
 always @(*)begin
-    /*for(integer j = 0; j < ROB_SIZE; j++)begin
-         self_submit[j] <= rob_flush;
-    end
-    //for(integer j = 0; j < ENTRY; j++)begin
-         self_submit[submit_id] <= submit_do || rob_flush;
-    //end*/
-    if(rob_flush)begin
-        self_submit <= ~(0);
+    if(rob_flush && partial_flush)begin
+        self_submit = '0;
+        for (integer j = 0; j < ROB_SIZE; j = j + 1) begin
+            if (br_mispredict_rob_id < tail) begin
+                if (j > br_mispredict_rob_id && j < tail)
+                    self_submit[j] = 1;
+            end else begin
+                if (j > br_mispredict_rob_id || j < tail)
+                    self_submit[j] = 1;
+            end
+        end
+    end else if(rob_flush)begin
+        self_submit = ~(0);
     end else if(submit_do) begin
-        self_submit <= 1 << submit_id;
+        self_submit = 1 << submit_id;
     end else begin
-        self_submit <= 0;
+        self_submit = 0;
     end
-    
 end
 
 generate
@@ -418,6 +447,7 @@ for(genvar i = 0; i < ROB_SIZE; i++)begin
     assign rs2  [i] = rob_stored_value[i].rs2_addr  ;
     assign rd   [i] = rob_stored_value[i].rd_addr   ;
     assign valid[i] = rob_stored_value[i].valid     ;
+    assign opcode[i] = rob_stored_value[i].opcode   ;
 end
 endgenerate
 pipe_t issue_chosen [ISSUE-1:0];
@@ -442,17 +472,15 @@ for(genvar k = 0; k < ISSUE; k++) begin
     assign issue_out[k].taddr     = 32'b0;
     assign issue_out[k].jump      = 1'b0;
     assign issue_out[k].valid     = issue_do[k];
+    assign issue_out[k].pred_taken = issue_do[k] ? issue_chosen[k].pred_taken : 1'b0;
+    assign issue_out[k].pred_pc   = issue_do[k] ? issue_chosen[k].pred_pc   : 32'b0;
 end
 endgenerate
 
 
 
-pipe_t submit_chosen;
-assign submit_chosen = submit_do? rob_stored_value[submit_id] : '0;
-assign rob_flush = submit_do?submit_chosen.jump : '0;
-assign rob_new_pc = submit_do?submit_chosen.taddr : '0;
-assign rd_addr[0]  = submit_do?submit_chosen.rd_addr : '0;
-assign rd_data[0]  = submit_do?submit_chosen.result  : '0;
+assign rd_addr[0]  = submit_do ? submit_chosen.rd_addr : '0;
+assign rd_data[0]  = submit_do ? submit_chosen.result  : '0;
 
 
 
@@ -460,10 +488,13 @@ assign rd_data[0]  = submit_do?submit_chosen.result  : '0;
 
 // Queue Ctl
 always @(posedge clk or negedge rst_n) begin
-        if (!rst_n | rob_flush)begin
+        if (!rst_n | commit_jump) begin
             head <= '0;
             tail <= '0;
             rob_count <= '0;
+        end else if (partial_flush) begin
+            tail <= br_mispredict_rob_id + 1;
+            rob_count <= (br_mispredict_rob_id + 1) - head;
         end else begin
             head <= head + submit_do; 
             tail <= tail + alloc_amount;

@@ -47,6 +47,8 @@ module RV32MEM(
     assign mem_out.taddr     = ex_in.taddr;
     assign mem_out.jump      = ex_in.jump;
     assign mem_out.valid     = ex_in.valid;
+    assign mem_out.pred_taken = ex_in.pred_taken;
+    assign mem_out.pred_pc   = ex_in.pred_pc;
 
 endmodule
 //ENDFILE RV32MEM.v 

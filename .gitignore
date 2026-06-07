@@ -10,3 +10,4 @@ build/
 log/
 
 xelab.pb
+vivado*
