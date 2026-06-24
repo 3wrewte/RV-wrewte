@@ -134,11 +134,14 @@ module RV32TOP(
 
         for (k = 0; k < BRU_NUM; k = k + 1) begin : bru_lane
             localparam idx = IDX_BRU + k;
+            // BRU input register: flushed normally
             PIPELINE_REG PREG1(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(issue_out[idx]),.out(EX_in[idx]));
             RV32EX_BRU U_EX(.dec_in(EX_in[idx]),.ex_out(EX_out[idx]),
                 .br_mispredict(bru_mispredict[k]),.br_correct_pc(bru_correct_pc[k]),
                 .bht_update_valid(bru_bht_valid[k]),.bht_update_pc(bru_bht_pc[k]),.bht_taken(bru_bht_taken[k]));
-            PIPELINE_REG PREG2(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(EX_out[idx]),.out(WB_in[idx]));
+            // BRU→WB register: NOT flushed on mispredict (result must reach ROB)
+            wire flush_bru_wb = flush_backend & ~bru_mispredict[k];
+            PIPELINE_REG PREG2(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_bru_wb),.in(EX_out[idx]),.out(WB_in[idx]));
         end
 
         assign br_mispredict        = bru_mispredict[0];

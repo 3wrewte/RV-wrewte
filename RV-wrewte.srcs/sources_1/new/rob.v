@@ -273,23 +273,27 @@ end
 endgenerate
 
 //-----------------------------------------------------------------------
-// Issue: cascade (BRU_NUM=0 for now, use cascade for LSU + ALU)
+// Issue: independent pools — strict separation by opcode type
+// LSU pool: ready & is_lsu        (load/store only)
+// BRU pool: ready & is_branch     (branch/jal/jalr only)
+// ALU pool: ready & ~is_lsu & ~is_branch  (U/I/R type only)
 //-----------------------------------------------------------------------
 wire [ISSUE-1:0] issue_do;
 wire [ROB_BITS-1:0] issue_id_realloc [ISSUE-1:0];
 
-wire [ROB_SIZE-1:0] avail [ISSUE:0];
-assign avail[0] = ready;
-
 generate
-for (genvar k = 0; k < ISSUE; k++) begin
+for (genvar k = 0; k < ISSUE; k++) begin : gen_issue
+    wire [ROB_SIZE-1:0] pool;
+    if (k == IDX_LSU)
+        assign pool = ready & is_lsu;
+    else if (k == IDX_BRU)
+        assign pool = ready & is_branch;
+    else
+        assign pool = ready & ~is_lsu & ~is_branch;
+
     wire [ROB_BITS-1:0] id;
-    LSB#(.WIDTH(ROB_BITS)) enc_iss(.in(avail[k]), .out(id));
-    assign issue_do[k] = |avail[k];
-    wire [ROB_SIZE-1:0] mask = issue_do[k] ? (1'b1 << id) : '0;
-    assign avail[k+1] = (k == 0)
-        ? avail[k] & ~mask & ~is_lsu
-        : avail[k] & ~mask;
+    LSB#(.WIDTH(ROB_BITS)) enc(.in(pool), .out(id));
+    assign issue_do[k] = |pool;
     assign issue_id_realloc[k] = id;
 end
 endgenerate
@@ -353,9 +357,8 @@ pipe_t submit_chosen;
 assign submit_chosen = submit_do ? rob_stored_value[submit_id] : '0;
 wire commit_jump = submit_do && submit_chosen.jump;
 
-assign rob_flush  = commit_jump || partial_flush;
-assign rob_new_pc = partial_flush ? br_mispredict_target :
-                    commit_jump  ? submit_chosen.taddr : '0;
+assign rob_flush  = partial_flush;
+assign rob_new_pc = partial_flush ? br_mispredict_target : '0;
 
 pipe_t rob_alloc   [ROB_SIZE-1:0];
 pipe_t rob_receive [ROB_SIZE-1:0];
@@ -404,7 +407,7 @@ always @(*)begin
 end
 
 always @(*)begin
-    if(rob_flush && partial_flush)begin
+    if(partial_flush)begin
         self_submit = '0;
         for (integer j = 0; j < ROB_SIZE; j = j + 1) begin
             if (br_mispredict_rob_id < tail) begin
@@ -415,8 +418,6 @@ always @(*)begin
                     self_submit[j] = 1;
             end
         end
-    end else if(rob_flush)begin
-        self_submit = ~(0);
     end else if(submit_do) begin
         self_submit = 1 << submit_id;
     end else begin
@@ -488,7 +489,7 @@ assign rd_data[0]  = submit_do ? submit_chosen.result  : '0;
 
 // Queue Ctl
 always @(posedge clk or negedge rst_n) begin
-        if (!rst_n | commit_jump) begin
+        if (!rst_n) begin
             head <= '0;
             tail <= '0;
             rob_count <= '0;
