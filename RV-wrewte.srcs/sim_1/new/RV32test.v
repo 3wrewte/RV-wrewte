@@ -65,6 +65,8 @@ module RV32test(
         .in    (in    ),
         .in_en (in_en ),
         .out   (out   ),
-        .out_en(out_en)
+        .out_en(out_en),
+        .uart_rxd(1'b1),
+        .uart_txd()
     );
 endmodule

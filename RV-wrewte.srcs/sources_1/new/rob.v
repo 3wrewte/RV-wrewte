@@ -19,7 +19,19 @@ module rob_entry(
     );
     
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n | submit)begin
+        if (!rst_n)begin
+            value.opcode   <= '0;
+            value.rs1_addr <= '0;
+            value.rs2_addr <= '0;
+            value.rd_addr  <= '0;
+            value.funct3   <= '0;
+            value.funct7   <= '0;
+            value.imm      <= '0;
+            value.pc       <= '0;
+            value.valid    <= '0;
+            value.pred_taken <= '0;
+            value.pred_pc   <= '0;
+        end else if (submit)begin
             value.opcode   <= '0;
             value.rs1_addr <= '0;
             value.rs2_addr <= '0;
@@ -58,7 +70,11 @@ module rob_entry(
         end
     end
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n | submit)begin
+        if (!rst_n)begin
+            value.result <= '0;
+            value.taddr  <= '0;
+            value.jump   <= '0;
+        end else if (submit)begin
             value.result <= '0;
             value.taddr  <= '0;
             value.jump   <= '0;
@@ -73,10 +89,22 @@ module rob_entry(
         end
     end
     always_ff @(posedge clk or negedge rst_n)begin
-        value.rob_id   <= '0;
-        value.instr    <= '0;
-        value.rs1_data <= '0;
-        value.rs2_data <= '0;
+        if(!rst_n)begin
+            value.rob_id   <= '0;
+            value.instr    <= '0;
+            value.rs1_data <= '0;
+            value.rs2_data <= '0;
+        end else if(submit)begin
+            value.rob_id   <= '0;
+            value.instr    <= '0;
+            value.rs1_data <= '0;
+            value.rs2_data <= '0;
+        end else begin
+            value.rob_id   <= value.rob_id;
+            value.instr    <= value.instr;
+            value.rs1_data <= value.rs1_data;
+            value.rs2_data <= value.rs2_data;
+        end
     end
     
     /*assign issue_out.opcode   = value.opcode  ;
@@ -114,7 +142,10 @@ module rob_entry(
     assign submit_out.rs2_data = '0;*/
     
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n | submit | alloc)begin
+        if (!rst_n)begin
+            issued   <= '0;
+            received <= '0;
+        end else if (submit | alloc)begin
             issued   <= '0;
             received <= '0;
         end else if(issue)begin

@@ -7,7 +7,9 @@ module RV32TOP(
     input  [31:0] in,
     output        in_en,
     output [31:0] out,
-    output        out_en
+    output        out_en,
+    input         uart_rxd,
+    output        uart_txd
 );
     parameter FETCH_NUM = 2;
     parameter LSU_NUM   = 1;
@@ -61,7 +63,7 @@ module RV32TOP(
     wire br_mispredict;
     wire [31:0] br_mispredict_rob_id, br_mispredict_target;
 
-    rob#(.ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM)) rob_u(
+    rob#(.ROB_SIZE(16), .ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM)) rob_u(
         .clk(clk), .rst_n(rst_n),
         .alloc_in(alloc_in), .rob_alloc_ready(rob_alloc_ready),
         .issue_out(issue_out), .receive_in(receive_in),
@@ -109,7 +111,7 @@ module RV32TOP(
         PIPELINE_REG PREG3(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(MEM_out[k]),.out(WB_in[idx]));
     end endgenerate
 
-    BUS BUS_u(.clk(clk),.rst_n(rst_n),.Load(Load),.Store(Store),.addr(bus_addr),.data(bus_data_out),.width(bus_width),.D_data(bus_data_in),.in(in),.in_en(in_en),.out(out),.out_en(out_en));
+    BUS BUS_u(.clk(clk),.rst_n(rst_n),.Load(Load),.Store(Store),.addr(bus_addr),.data(bus_data_out),.width(bus_width),.D_data(bus_data_in),.in(in),.in_en(in_en),.out(out),.out_en(out_en),.uart_rxd(uart_rxd),.uart_txd(uart_txd));
 
     //===================================================================
     // ALU backends

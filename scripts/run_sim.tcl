@@ -13,6 +13,7 @@ if {$TEST eq ""} { set TEST "read_write" }
 
 set ROOT [file normalize [file dirname [info script]]/..]
 set SRC  [file join $ROOT "RV-wrewte.srcs/sources_1/new"]
+set VEND [file join $ROOT "RV-wrewte.srcs/sources_1/vendor"]
 set SIM  [file join $ROOT "RV-wrewte.srcs/sim_1/new"]
 set TMP  [file join $ROOT "tmp"]
 set LOG  [file join $ROOT "log"]
@@ -55,6 +56,8 @@ set src_files [list \
     [file join $SRC "RAM32.v"] \
     [file join $SRC "I_Cache.v"] \
     [file join $SRC "BHT.v"] \
+    [file join $VEND "uart_rx.v"] \
+    [file join $VEND "uart_tx.v"] \
     [file join $SRC "RV32DEC.v"] \
     [file join $SRC "RV32OPDEC.v"] \
     [file join $SRC "RV32COND.v"] \
