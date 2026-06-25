@@ -11,3 +11,5 @@ log/
 
 xelab.pb
 vivado*
+
+tests/cache_test/obj_dir/

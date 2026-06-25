@@ -73,7 +73,7 @@ module ls_entry #(
         end else if (issue) begin
             ls <= ls;
             addr <= addr;
-            data <= data;
+            data <= receive ? receive_data : data;
             cpu_id <= cpu_id;
             mask <= mask;
             valid <= valid;
@@ -110,7 +110,8 @@ module cache #(
     parameter CACHE_LINES = 256,
     parameter INDEX_BITS = $clog2(CACHE_LINES),
     parameter OFFSET_BITS = 2,
-    parameter TAG_BITS = 32 - INDEX_BITS - OFFSET_BITS  // line size 4 bytes, offset 2 bits, assume aligned word access
+    parameter TAG_BITS = 32 - INDEX_BITS - OFFSET_BITS,  // line size 4 bytes, offset 2 bits, assume aligned word access
+    parameter ISSUE_WINDOW = 4   // only issue from head..head+ISSUE_WINDOW-1
 )(
     input                clk               ,
     input                rst_n             ,
@@ -191,27 +192,35 @@ realloc #(.WIDTH(1) , .DEPTH(LS_SIZE)) realloc_issued  (.head(head),.in(issued  
 realloc #(.WIDTH(1) , .DEPTH(LS_SIZE)) realloc_received(.head(head),.in(received),.out(received_realloc));
 realloc #(.WIDTH(32), .DEPTH(LS_SIZE)) realloc_addr    (.head(head),.in(addr_arr),.out(addr_realloc    ));
 
-reg [LS_SIZE-1:0] conflict_n;
-always_ff @(*)begin
-for(integer i = 0; i < LS_SIZE; i++) begin
-    conflict_n[i] = 1;
-    for(integer j = 0; j < i; j++) begin
-        conflict_n[i] = conflict_n[i] & (addr_realloc[i] != addr_realloc[j]);
-    end
-end
-end 
-//assign conflict_n = '1;  // No dependency check for now, assume no disambiguation
-
+// Conflict detection: only within ISSUE_WINDOW entries (head..head+WINDOW-1)
+// Any address match with an older in-window entry blocks the younger entry.
+// Handles RAW, WAR, WAW uniformly (simplest correct policy).
 wire [LS_SIZE-1:0] ready;
 generate
-for(genvar i = 0; i < LS_SIZE; i++) begin
-    assign ready[i] = conflict_n[i] & (!issued_realloc[i]) & valid_realloc[i];
+for(genvar i = 0; i < LS_SIZE; i++) begin : gen_ready
+    if (i < ISSUE_WINDOW) begin : gen_in_window
+        // Check conflicts with older entries in window
+        wire no_conflict;
+        if (i == 0) begin : gen_first
+            assign no_conflict = 1'b1;
+        end else begin : gen_rest
+            // OR-reduction: conflict if ANY older entry j has same address
+            wire [i-1:0] pair_conflict;
+            for (genvar j = 0; j < i; j++) begin : gen_pair
+                assign pair_conflict[j] = (addr_realloc[i] == addr_realloc[j]);
+            end
+            assign no_conflict = ~(|pair_conflict);
+        end
+        assign ready[i] = no_conflict & (!issued_realloc[i]) & valid_realloc[i];
+    end else begin : gen_out_window
+        assign ready[i] = 1'b0;
+    end
 end
 endgenerate
 
 wire issue_do;
 wire [LS_BITS-1:0] issue_id_realloc;
-LSB #(.WIDTH(LS_SIZE)) enc_issue(
+LSB #(.WIDTH(LS_BITS)) enc_issue(
     .in(ready),
     .out(issue_id_realloc)
 );
@@ -254,13 +263,12 @@ assign submit_data = data_arr[submit_head];
 
 
 
-always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-        for (integer i = 0; i < CACHE_LINES; i++) begin
-            cache_valid[i] <= 0;
-            cache_tag  [i] <= 0;
-            cache_data [i] <= 0;
-        end
+integer init_i;
+initial begin
+    for (init_i = 0; init_i < CACHE_LINES; init_i = init_i + 1) begin
+        cache_valid[init_i] = 1'b0;
+        cache_tag  [init_i] = '0;
+        cache_data [init_i] = '0;
     end
 end
 
@@ -271,17 +279,16 @@ always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         // reset already handled
     end else begin
-        if (issue_do && !issue_ls && issue_hit) begin // Store: only when hit
+        if (issue_do && !issue_ls && issue_hit) begin // Store hit: update cache line
             cache_valid[issue_index] <= 1;
             cache_tag[issue_index] <= issue_tag;
-            cache_data[issue_index] <= issue_data & (issue_mask32 << (issue_offset << 8)) | 
-                cache_data[issue_index] & ~(issue_mask32 << (issue_offset << 8));
+            cache_data[issue_index] <= ((issue_data << {issue_offset, 3'b0}) & issue_mask32) |
+                (cache_data[issue_index] & ~issue_mask32);
         end
-        if (lower_receive_do) begin // Load miss fill
+        if (lower_receive_do) begin // Load miss fill: write full word from lower level
             cache_valid[fill_index] <= 1;
             cache_tag[fill_index] <= fill_tag;
-            cache_data[fill_index] <= lower_receive_data & (issue_mask32 << (issue_offset << 8)) | 
-                cache_data[issue_index] & ~(issue_mask32 << (issue_offset << 8));
+            cache_data[fill_index] <= lower_receive_data;
         end
     end
 end
@@ -376,7 +383,7 @@ assign lower_ls    = lower_valid ? issue_ls                    : 0;
 assign lower_addr  = lower_valid ? issue_addr                  : 0;
 assign lower_data  = lower_valid ? (issue_ls ? 0 : issue_data) : 0;
 assign lower_id    = lower_valid ? issue_id                    : 0;
-assign lower_mask  = lower_valid ? 4'b1111                     : 0;
+assign lower_mask  = lower_valid ? issue_mask                    : 0;
 
 // Queue control
 always @(posedge clk or negedge rst_n) begin

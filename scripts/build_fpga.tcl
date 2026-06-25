@@ -8,6 +8,11 @@ foreach arg $argv {
     if {$arg eq "-v" || $arg eq "--verbose"} { set VERBOSE 1 }
 }
 
+# Use all available cores for synth/impl
+set ncpu [exec nproc]
+set max_threads [expr {min($ncpu, 32)}]
+set_param general.maxThreads $max_threads
+
 set ROOT [file normalize [file dirname [info script]]/..]
 set SRC  [file join $ROOT "RV-wrewte.srcs/sources_1/new"]
 set VEND [file join $ROOT "RV-wrewte.srcs/sources_1/vendor"]

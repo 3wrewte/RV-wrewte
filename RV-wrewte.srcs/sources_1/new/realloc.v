@@ -41,7 +41,7 @@ module realloc#(
         genvar j;
         for(i = 0; i < BITS; i++)begin
             for(j = 0; j < DEPTH; j++)begin
-                assign step[i+1][j] = (head[i])?step[i][{j + (1 << i)}[BITS-1:0]]:step[i][j];
+            assign step[i+1][j] = (head[i])?step[i][(j + (1<<i)) % DEPTH]:step[i][j];
             end
         end
     endgenerate
