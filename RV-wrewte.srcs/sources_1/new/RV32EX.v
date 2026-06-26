@@ -24,28 +24,32 @@ module RV32EX(
     wire S   = (opcode == 7'b0100011);
     wire I   = (opcode == 7'b0010011) || (opcode == 7'b0000011) || (opcode == 7'b1100111); // rough
     wire R   = (opcode == 7'b0110011);
+    wire U_lui   = (opcode == 7'b0110111);
+    wire U_auipc = (opcode == 7'b0010111);
 
     // ALU inputs selection
     reg [31:0] alu_in1;
     reg [31:0] alu_in2;
     always @(*) begin
-        if (jal || jalr) alu_in1 = pc;
+        if (jal || jalr || U_auipc) alu_in1 = pc;
         else if (I || R) alu_in1 = rs1;
-        else if (opcode == 7'b0010111) alu_in1 = pc; // auipc-like
-        else alu_in1 = 32'b0;
+        else alu_in1 = 32'b0;  // U_lui: 0 + imm
     end
     always @(*) begin
         if (jal || jalr) alu_in2 = 32'h4;
-        else if (I) alu_in2 = imm;
+        else if (I || U_lui || U_auipc) alu_in2 = imm;
         else if (R) alu_in2 = rs2;
         else alu_in2 = 32'b0;
     end
+
+    // Force ADD for U-type (funct3 bits are part of immediate, not operation)
+    wire [2:0] eff_funct3 = (U_lui || U_auipc) ? 3'b000 : funct3;
 
     wire [31:0] res;
     RV32ALU RV32ALU_u(
         .in1(alu_in1),
         .in2(alu_in2),
-        .funct3(funct3),
+        .funct3(eff_funct3),
         .funct7(funct7),
         .out(res)
     );

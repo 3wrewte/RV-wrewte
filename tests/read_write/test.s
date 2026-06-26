@@ -1,5 +1,5 @@
 addi x1, x0, 0x000          
-addi x2, x0, 0x100    
+lui  x2, 0x1                # x2 = 0x1000 (DDR3 base)
 addi x4, x0, 0x000   
 addi x5, x0, 0x004
 

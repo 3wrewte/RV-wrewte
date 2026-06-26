@@ -40,25 +40,10 @@ module BUS(
     output         uart_txd
     );
     reg [31:0] bus;
-    wire       RAM_en    = (addr < 512 && addr >= 256);
-    wire       RAM_read  = RAM_en? Load : 1'b0;
-    wire       RAM_write = RAM_en? Store: 1'b0;
-    wire [31:0]RAM_addr  = RAM_en? (addr & 32'hff) : 32'b0;
-    wire [ 2:0]RAM_width = RAM_en? width: 3'b0;
-    wire [31:0]RAM_rdata ;
-    RAM32 #(.depth(64)) RAM32_u(
-        .clk  (clk  ), 
-        .rst_n(rst_n), 
-        .read (RAM_read ), 
-        .write(RAM_write), 
-        .addr (RAM_addr ), 
-        .width(RAM_width), 
-        .rdata(RAM_rdata), 
-        .wdata(bus      )
-    );
-    assign out_en = (addr == 32'b100);
+
+    assign out_en = (addr == 32'd4) && Store;
     assign out = out_en? bus : 32'b0;
-    
+
     assign D_data = Load? bus: 32'b0;
 
     //---------------------------------
@@ -103,9 +88,7 @@ module BUS(
 
     always @(*)begin
         if(Load)begin
-            if(addr < 512 && addr >= 256)begin
-                bus <= RAM_rdata;
-            end else if(addr == 0)begin
+            if(addr == 0)begin
                 bus <= in;
             end else if(addr == 32'h84)begin
                 bus <= {24'b0, rx_latch};

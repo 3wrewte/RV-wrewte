@@ -10,6 +10,7 @@ build/
 log/
 
 xelab.pb
+xvlog.pb
 vivado*
 
 tests/cache_test/obj_dir/

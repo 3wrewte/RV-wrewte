@@ -256,9 +256,9 @@ assign lower_receive_data = lower_submit_data;
 // Submit
 wire submit_do = received[head] && valid[head];
 wire [LS_BITS-1:0] submit_head = head;
-assign submit_valid = submit_do;
-assign submit_id = cpu_id_arr[submit_head];
-assign submit_data = data_arr[submit_head];
+    assign submit_valid = submit_do;
+    assign submit_id = cpu_id_arr[submit_head];
+    assign submit_data = data_arr[submit_head];
 // End Submit
 
 

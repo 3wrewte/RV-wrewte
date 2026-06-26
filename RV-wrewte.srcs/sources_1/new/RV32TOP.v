@@ -29,6 +29,7 @@ module RV32TOP(
     wire stall_frontend, stall_backend, flush_frontend, flush_backend, en_PC;
     wire redirect_valid, rob_alloc_ready, rob_flush;
     wire [31:0] redirect_pc, rob_new_pc;
+    wire lsu_ready;
 
     pipe_t alloc_in[FETCH_NUM-1:0];
     pipe_t issue_out[ISSUE_NUM-1:0];
@@ -68,6 +69,7 @@ module RV32TOP(
         .alloc_in(alloc_in), .rob_alloc_ready(rob_alloc_ready),
         .issue_out(issue_out), .receive_in(receive_in),
         .br_mispredict(br_mispredict), .br_mispredict_rob_id(br_mispredict_rob_id), .br_mispredict_target(br_mispredict_target),
+        .lsu_ready(lsu_ready),
         .rob_flush(rob_flush), .rob_new_pc(rob_new_pc)
     );
 
@@ -99,19 +101,110 @@ module RV32TOP(
     wire [31:0] bus_addr, bus_data_out, bus_data_in;
     wire [2:0] bus_width;
 
+    // LSU stall/ready
+    wire lsu_stall;
+
+    // Cache ↔ wrapper interface
+    wire        cache_cpu_ls, cache_cpu_valid;
+    wire [31:0] cache_cpu_addr, cache_cpu_data;
+    wire [4:0]  cache_cpu_id;
+    wire [3:0]  cache_cpu_mask;
+    wire        cache_ls_valid;
+    wire        cache_submit_valid;
+    wire [4:0]  cache_submit_id;
+    wire [31:0] cache_submit_data;
+
+    // Cache ↔ bridge (lower_*)
+    wire        lower_valid, lower_ls, lower_ls_valid;
+    wire [31:0] lower_addr, lower_data;
+    wire [4:0]  lower_id;
+    wire [3:0]  lower_mask;
+    wire        lower_submit_valid;
+    wire [4:0]  lower_submit_id;
+    wire [31:0] lower_submit_data;
+
+    // Bridge ↔ DRAM (app_*)
+    wire [27:0] app_addr;
+    wire [2:0]  app_cmd;
+    wire        app_en, app_rdy;
+    wire [255:0] app_wdf_data;
+    wire [31:0] app_wdf_mask;
+    wire        app_wdf_end, app_wdf_wren, app_wdf_rdy;
+    wire [255:0] app_rd_data;
+    wire        app_rd_data_valid, app_rd_data_end;
+    wire        init_calib_complete;
+
     //===================================================================
-    // LSU backends
+    // LSU backend (cache_wrapper replaces RV32MEM)
     //===================================================================
     generate for(k = 0; k < LSU_NUM; k = k + 1) begin : lsu_lane
         localparam idx = IDX_LSU + k;
-        PIPELINE_REG PREG1(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(issue_out[idx]),.out(EX_in[idx]));
+        PIPELINE_REG PREG1(.clk(clk),.rst_n(rst_n),.stall(stall_backend | lsu_stall),.flush(flush_backend),.in(issue_out[idx]),.out(EX_in[idx]));
         RV32EX U_EX(.dec_in(EX_in[idx]),.ex_out(EX_out[idx]));
-        PIPELINE_REG PREG2(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(EX_out[idx]),.out(MEM_in[k]));
-        RV32MEM U_MEM(.ex_in(MEM_in[k]),.Load(Load),.Store(Store),.addr(bus_addr),.data(bus_data_out),.width(bus_width),.D_data(bus_data_in),.mem_out(MEM_out[k]));
-        PIPELINE_REG PREG3(.clk(clk),.rst_n(rst_n),.stall(stall_backend),.flush(flush_backend),.in(MEM_out[k]),.out(WB_in[idx]));
+        wire lsu_flush = flush_backend & ~lsu_stall;  // protect PREG2/PREG3 during cache processing
+        PIPELINE_REG PREG2(.clk(clk),.rst_n(rst_n),.stall(stall_backend | lsu_stall),.flush(lsu_flush),.in(EX_out[idx]),.out(MEM_in[k]));
+        cache_wrapper U_CW(
+            .clk(clk), .rst_n(rst_n), .flush(flush_backend),
+            .ex_in(MEM_in[k]), .mem_out(MEM_out[k]),
+            .lsu_stall(lsu_stall), .lsu_ready(lsu_ready),
+            .Load(Load), .Store(Store), .addr(bus_addr), .data(bus_data_out),
+            .width(bus_width), .D_data(bus_data_in),
+            .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
+            .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),
+            .ls_valid(cache_ls_valid),
+            .submit_valid(cache_submit_valid), .submit_id(cache_submit_id),
+            .submit_data(cache_submit_data)
+        );
+        PIPELINE_REG PREG3(.clk(clk),.rst_n(rst_n),.stall(stall_backend | lsu_stall),.flush(lsu_flush),.in(MEM_out[k]),.out(WB_in[idx]));
     end endgenerate
 
+    // BUS: UART MMIO only (RAM removed)
     BUS BUS_u(.clk(clk),.rst_n(rst_n),.Load(Load),.Store(Store),.addr(bus_addr),.data(bus_data_out),.width(bus_width),.D_data(bus_data_in),.in(in),.in_en(in_en),.out(out),.out_en(out_en),.uart_rxd(uart_rxd),.uart_txd(uart_txd));
+
+    //===================================================================
+    // D-Cache subsystem: cache → mig_bridge → mock_dram
+    //===================================================================
+    cache #(.LS_SIZE(32), .CACHE_LINES(256)) cache_u(
+        .clk(clk), .rst_n(rst_n),
+        .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
+        .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),
+        .ls_valid(cache_ls_valid),
+        .submit_valid(cache_submit_valid), .submit_id(cache_submit_id),
+        .submit_data(cache_submit_data),
+        .lower_ls(lower_ls), .lower_addr(lower_addr), .lower_data(lower_data),
+        .lower_valid(lower_valid), .lower_id(lower_id), .lower_mask(lower_mask),
+        .lower_ls_valid(lower_ls_valid),
+        .lower_submit_valid(lower_submit_valid),
+        .lower_submit_id(lower_submit_id),
+        .lower_submit_data(lower_submit_data)
+    );
+
+    mig_bridge bridge_u(
+        .clk(clk), .rst_n(rst_n),
+        .lower_valid(lower_valid), .lower_ls(lower_ls),
+        .lower_addr(lower_addr), .lower_data(lower_data),
+        .lower_id(lower_id), .lower_mask(lower_mask),
+        .lower_ls_valid(lower_ls_valid),
+        .lower_submit_valid(lower_submit_valid),
+        .lower_submit_id(lower_submit_id),
+        .lower_submit_data(lower_submit_data),
+        .app_addr(app_addr), .app_cmd(app_cmd), .app_en(app_en), .app_rdy(app_rdy),
+        .app_wdf_data(app_wdf_data), .app_wdf_mask(app_wdf_mask),
+        .app_wdf_end(app_wdf_end), .app_wdf_wren(app_wdf_wren), .app_wdf_rdy(app_wdf_rdy),
+        .app_rd_data(app_rd_data), .app_rd_data_valid(app_rd_data_valid),
+        .app_rd_data_end(app_rd_data_end),
+        .init_calib_complete(init_calib_complete)
+    );
+
+    mock_dram #(.LATENCY(8)) dram_u(
+        .ui_clk(clk), .ui_rst(~rst_n),
+        .app_addr(app_addr), .app_cmd(app_cmd), .app_en(app_en), .app_rdy(app_rdy),
+        .app_wdf_data(app_wdf_data), .app_wdf_mask(app_wdf_mask),
+        .app_wdf_end(app_wdf_end), .app_wdf_wren(app_wdf_wren), .app_wdf_rdy(app_wdf_rdy),
+        .app_rd_data(app_rd_data), .app_rd_data_end(app_rd_data_end),
+        .app_rd_data_valid(app_rd_data_valid),
+        .init_calib_complete(init_calib_complete)
+    );
 
     //===================================================================
     // ALU backends

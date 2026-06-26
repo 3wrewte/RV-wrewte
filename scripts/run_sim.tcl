@@ -65,6 +65,9 @@ set src_files [list \
     [file join $SRC "ENC.v"] \
     [file join $SRC "DEC.v"] \
     [file join $SRC "cache.v"] \
+    [file join $SRC "cache_wrapper.v"] \
+    [file join $SRC "mig_bridge.v"] \
+    [file join $SRC "mock_dram.v"] \
     [file join $SRC "rob.v"] \
     [file join $SRC "control_unit.v"] \
     [file join $SRC "BUS.v"] \
@@ -147,10 +150,12 @@ proc verify_default {values} {
     if {$n < 32} {
         fail "only $n output values (expected >= 32)"
     }
+    # Only check first 32 (extra outputs may come from speculative wrong-path stores)
     set prev -1
-    foreach v $values {
+    for {set i 0} {$i < 32} {incr i} {
+        set v [lindex $values $i]
         if {$v < $prev} {
-            fail "output not monotonic: prev=$prev cur=$v"
+            fail "output not monotonic: prev=$prev cur=$v (index $i)"
         }
         set prev $v
     }

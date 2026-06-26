@@ -191,6 +191,9 @@ module rob #(
     input  [31:0]              br_mispredict_rob_id,
     input  [31:0]              br_mispredict_target,
 
+    // ---------- LSU backpressure ----------
+    input                      lsu_ready,       // 0 = LSU lane stalled (cache busy)
+
     // ---------- flush output ----------
     output reg                 rob_flush,
     output reg [31:0]          rob_new_pc
@@ -278,6 +281,7 @@ wire [32-1:0] rs_one_hot [ROB_SIZE-1:0];
 wire [32-1:0] rd_one_hot [ROB_SIZE-1:0];
 wire [32-1:0] occupied [ROB_SIZE-1:0];
 wire [ROB_SIZE-1:0] conflict_n;
+wire [ROB_SIZE-1:0] branched;
 wire [ROB_SIZE-1:0] is_lsu;
 wire [ROB_SIZE-1:0] is_branch;
 wire [ROB_SIZE-1:0] ready;
@@ -297,9 +301,16 @@ for(genvar i = 1; i < ROB_SIZE; i++) begin
     assign conflict_n[i] = ~(|(occupied[i-1] & rs_one_hot[i]));
 end
 endgenerate
+assign branched[0] = '0;
+generate
+for(genvar i = 1; i < ROB_SIZE; i++) begin
+    assign branched[i] = branched[i-1] | is_branch[i-1];
+end
+endgenerate
+
 generate
 for(genvar i = 0; i < ROB_SIZE; i++) begin
-    assign ready[i] = conflict_n[i] & (!issued_realloc[i]) & valid_realloc[i];
+    assign ready[i] = conflict_n[i] & (!issued_realloc[i]) & valid_realloc[i] & !(is_lsu[i] & branched[i]);
 end
 endgenerate
 
@@ -316,7 +327,7 @@ generate
 for (genvar k = 0; k < ISSUE; k++) begin : gen_issue
     wire [ROB_SIZE-1:0] pool;
     if (k == IDX_LSU)
-        assign pool = ready & is_lsu;
+        assign pool = ready & is_lsu & {ROB_SIZE{lsu_ready}};
     else if (k == IDX_BRU)
         assign pool = ready & is_branch;
     else
