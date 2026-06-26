@@ -9,9 +9,25 @@ module RV32TOP(
     output [31:0] out,
     output        out_en,
     input         uart_rxd,
-    output        uart_txd
+    output        uart_txd,
+
+    input         mig_ui_clk,
+    input         mig_ui_rst,
+    input         mig_init_calib_complete,
+    output [27:0] app_addr,
+    output [2:0]  app_cmd,
+    output        app_en,
+    input         app_rdy,
+    output [255:0] app_wdf_data,
+    output [31:0] app_wdf_mask,
+    output        app_wdf_end,
+    output        app_wdf_wren,
+    input         app_wdf_rdy,
+    input  [255:0] app_rd_data,
+    input         app_rd_data_valid,
+    input         app_rd_data_end
 );
-    parameter FETCH_NUM = 2;
+    parameter FETCH_NUM = 1;
     parameter LSU_NUM   = 1;
     parameter ALU_NUM   = 1;
     parameter BRU_NUM   = 1;
@@ -64,7 +80,7 @@ module RV32TOP(
     wire br_mispredict;
     wire [31:0] br_mispredict_rob_id, br_mispredict_target;
 
-    rob#(.ROB_SIZE(16), .ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM)) rob_u(
+    rob#(.ROB_SIZE(8), .ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM)) rob_u(
         .clk(clk), .rst_n(rst_n),
         .alloc_in(alloc_in), .rob_alloc_ready(rob_alloc_ready),
         .issue_out(issue_out), .receive_in(receive_in),
@@ -123,17 +139,6 @@ module RV32TOP(
     wire [4:0]  lower_submit_id;
     wire [31:0] lower_submit_data;
 
-    // Bridge ↔ DRAM (app_*)
-    wire [27:0] app_addr;
-    wire [2:0]  app_cmd;
-    wire        app_en, app_rdy;
-    wire [255:0] app_wdf_data;
-    wire [31:0] app_wdf_mask;
-    wire        app_wdf_end, app_wdf_wren, app_wdf_rdy;
-    wire [255:0] app_rd_data;
-    wire        app_rd_data_valid, app_rd_data_end;
-    wire        init_calib_complete;
-
     //===================================================================
     // LSU backend (cache_wrapper replaces RV32MEM)
     //===================================================================
@@ -164,7 +169,7 @@ module RV32TOP(
     //===================================================================
     // D-Cache subsystem: cache → mig_bridge → mock_dram
     //===================================================================
-    cache #(.LS_SIZE(32), .CACHE_LINES(256)) cache_u(
+    cache #(.LS_SIZE(2), .CACHE_LINES(16)) cache_u(
         .clk(clk), .rst_n(rst_n),
         .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
         .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),
@@ -181,6 +186,7 @@ module RV32TOP(
 
     mig_bridge bridge_u(
         .clk(clk), .rst_n(rst_n),
+        .ui_clk(mig_ui_clk), .ui_rst(mig_ui_rst),
         .lower_valid(lower_valid), .lower_ls(lower_ls),
         .lower_addr(lower_addr), .lower_data(lower_data),
         .lower_id(lower_id), .lower_mask(lower_mask),
@@ -193,17 +199,7 @@ module RV32TOP(
         .app_wdf_end(app_wdf_end), .app_wdf_wren(app_wdf_wren), .app_wdf_rdy(app_wdf_rdy),
         .app_rd_data(app_rd_data), .app_rd_data_valid(app_rd_data_valid),
         .app_rd_data_end(app_rd_data_end),
-        .init_calib_complete(init_calib_complete)
-    );
-
-    mock_dram #(.LATENCY(8)) dram_u(
-        .ui_clk(clk), .ui_rst(~rst_n),
-        .app_addr(app_addr), .app_cmd(app_cmd), .app_en(app_en), .app_rdy(app_rdy),
-        .app_wdf_data(app_wdf_data), .app_wdf_mask(app_wdf_mask),
-        .app_wdf_end(app_wdf_end), .app_wdf_wren(app_wdf_wren), .app_wdf_rdy(app_wdf_rdy),
-        .app_rd_data(app_rd_data), .app_rd_data_end(app_rd_data_end),
-        .app_rd_data_valid(app_rd_data_valid),
-        .init_calib_complete(init_calib_complete)
+        .init_calib_complete(mig_init_calib_complete)
     );
 
     //===================================================================

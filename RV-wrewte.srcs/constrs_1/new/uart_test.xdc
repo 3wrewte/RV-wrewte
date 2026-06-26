@@ -1,4 +1,4 @@
-# uart_test.xdc - Minimal constraints for UART loopback test
+# uart_test.xdc - Board constraints for UART + DDR3 CPU test
 # Target: xc7a35tfgg484-2 (Da Vinci Pro 35T)
 
 # Timing constraint: 50 MHz system clock
@@ -7,7 +7,7 @@ create_clock -period 20.000 -name sys_clk [get_ports sys_clk]
 # System clock and reset
 set_property -dict {PACKAGE_PIN R4 IOSTANDARD LVCMOS15} [get_ports sys_clk]
 set_property -dict {PACKAGE_PIN U7 IOSTANDARD LVCMOS15} [get_ports sys_rst_n]
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets sys_clk]
+set_property CLOCK_DEDICATED_ROUTE BACKBONE [get_nets sys_clk]
 
 # USB-UART (CH340)
 set_property -dict {PACKAGE_PIN E14 IOSTANDARD LVCMOS33} [get_ports uart_rxd]

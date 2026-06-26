@@ -9,10 +9,31 @@ import serial
 import sys
 import time
 import argparse
+import glob
+import subprocess
+
+def autodetect_port():
+    candidates = sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))
+    for dev in candidates:
+        try:
+            out = subprocess.check_output(
+                ["udevadm", "info", "-q", "property", dev],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception:
+            continue
+        props = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+        model = props.get("ID_MODEL", "")
+        vendor = props.get("ID_VENDOR_ID", "")
+        product = props.get("ID_MODEL_ID", "")
+        if "USB_Serial" in model or (vendor, product) == ("1a86", "7523"):
+            return dev
+    return candidates[0] if candidates else None
 
 def main():
     ap = argparse.ArgumentParser(description="UART loopback test")
-    ap.add_argument("--port", default="/dev/ttyUSB1")
+    ap.add_argument("--port", default=None)
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--timeout", type=float, default=3.0,
                     help="seconds to wait per byte echo")
@@ -21,9 +42,13 @@ def main():
     test_data = bytes(range(0x21, 0x7F))  # printable ASCII, skip space
 
     try:
-        ser = serial.Serial(args.port, args.baud, timeout=args.timeout)
+        port = args.port or autodetect_port()
+        if not port:
+            print("FAIL: no serial port found")
+            sys.exit(1)
+        ser = serial.Serial(port, args.baud, timeout=args.timeout)
     except serial.SerialException as e:
-        print(f"FAIL: cannot open {args.port}: {e}")
+        print(f"FAIL: cannot open serial port: {e}")
         sys.exit(1)
 
     time.sleep(0.2)

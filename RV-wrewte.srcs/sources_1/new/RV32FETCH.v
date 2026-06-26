@@ -19,7 +19,14 @@ module RV32FETCH#(
     wire [FETCH_NUM-1:0] slot_valid;
 
     wire slot0_taken = slot_pred_taken[0];
-    wire slot1_taken = (FETCH_NUM > 1) ? slot_pred_taken[1] : 1'b0;
+    wire slot1_taken;
+    generate
+        if (FETCH_NUM > 1) begin : gen_slot1_taken
+            assign slot1_taken = slot_pred_taken[1];
+        end else begin : gen_no_slot1_taken
+            assign slot1_taken = 1'b0;
+        end
+    endgenerate
 
     assign slot_valid[0] = 1'b1;
 

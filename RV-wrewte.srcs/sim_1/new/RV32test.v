@@ -42,6 +42,19 @@ module RV32test(
     
     reg  [31:0]   in    ;
     wire          in_en ;
+    wire [27:0]   app_addr;
+    wire [2:0]    app_cmd;
+    wire          app_en;
+    wire          app_rdy;
+    wire [255:0]  app_wdf_data;
+    wire [31:0]   app_wdf_mask;
+    wire          app_wdf_end;
+    wire          app_wdf_wren;
+    wire          app_wdf_rdy;
+    wire [255:0]  app_rd_data;
+    wire          app_rd_data_valid;
+    wire          app_rd_data_end;
+    wire          init_calib_complete;
     always @(posedge sys_clk or negedge sys_rst_n)begin
         if(!sys_rst_n)
             in <= 32'b0;
@@ -67,6 +80,39 @@ module RV32test(
         .out   (out   ),
         .out_en(out_en),
         .uart_rxd(1'b1),
-        .uart_txd()
+        .uart_txd(),
+        .mig_ui_clk(sys_clk),
+        .mig_ui_rst(~sys_rst_n),
+        .mig_init_calib_complete(init_calib_complete),
+        .app_addr(app_addr),
+        .app_cmd(app_cmd),
+        .app_en(app_en),
+        .app_rdy(app_rdy),
+        .app_wdf_data(app_wdf_data),
+        .app_wdf_mask(app_wdf_mask),
+        .app_wdf_end(app_wdf_end),
+        .app_wdf_wren(app_wdf_wren),
+        .app_wdf_rdy(app_wdf_rdy),
+        .app_rd_data(app_rd_data),
+        .app_rd_data_valid(app_rd_data_valid),
+        .app_rd_data_end(app_rd_data_end)
+    );
+
+    mock_dram #(.LATENCY(8)) dram_u(
+        .ui_clk(sys_clk),
+        .ui_rst(~sys_rst_n),
+        .app_addr(app_addr),
+        .app_cmd(app_cmd),
+        .app_en(app_en),
+        .app_rdy(app_rdy),
+        .app_wdf_data(app_wdf_data),
+        .app_wdf_mask(app_wdf_mask),
+        .app_wdf_end(app_wdf_end),
+        .app_wdf_wren(app_wdf_wren),
+        .app_wdf_rdy(app_wdf_rdy),
+        .app_rd_data(app_rd_data),
+        .app_rd_data_end(app_rd_data_end),
+        .app_rd_data_valid(app_rd_data_valid),
+        .init_calib_complete(init_calib_complete)
     );
 endmodule

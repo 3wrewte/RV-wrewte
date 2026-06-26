@@ -14,3 +14,5 @@ xvlog.pb
 vivado*
 
 tests/cache_test/obj_dir/
+RV-wrewte.srcs/sources_1/vendor/clk_wiz_0.v
+RV-wrewte.srcs/sources_1/vendor/clk_wiz_0_clk_wiz.v
