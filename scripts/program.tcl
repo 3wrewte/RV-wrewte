@@ -1,14 +1,19 @@
 ########################################################################
 # program.tcl - Program FPGA via JTAG (Vivado Hardware Manager)
-# Usage: vivado -mode batch -source scripts/program.tcl
+# Usage: vivado -mode batch -source scripts/program.tcl -tclargs [top|top_dram]
 ########################################################################
 
+set TOP "top"
+foreach arg $argv {
+    if {$arg ne ""} { set TOP $arg }
+}
+
 set ROOT [file normalize [file dirname [info script]]/..]
-set BIT  [file join $ROOT "build/fpga/rv32_fpga.runs/impl_1/top.bit"]
+set BIT  [file join $ROOT "build/fpga/rv32_fpga.runs/impl_1/${TOP}.bit"]
 
 if {![file exists $BIT]} {
     puts "ERROR: bitstream not found: $BIT"
-    puts "Run 'make fpga' first."
+    puts "Run 'make fpga' or 'make fpga-dram' first."
     exit 1
 }
 

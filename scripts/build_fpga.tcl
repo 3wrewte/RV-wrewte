@@ -4,8 +4,10 @@
 ########################################################################
 
 set VERBOSE 0
+set TOP "top"
 foreach arg $argv {
-    if {$arg eq "-v" || $arg eq "--verbose"} { set VERBOSE 1 }
+    if {$arg eq "-v" || $arg eq "--verbose"} { set VERBOSE 1 } \
+    elseif {$arg ne ""} { set TOP $arg }
 }
 
 # Use all available cores for synth/impl
@@ -49,14 +51,19 @@ add_files $src_files
 add_files $vend_files
 add_files -fileset constrs_1 $XDC
 
-# Add local IP cores (MIG + clk_wiz)
-set mig_xci [file join $IPDIR "mig_7series_0/mig_7series_0.xci"]
+# Add local IP cores required by the selected top.
+set bram_xci [file join $IPDIR "blk_mem_gen_0/blk_mem_gen_0.xci"]
+set mig_axi_xci [file join $IPDIR "mig_7series_axi_0/mig_7series_axi_0.xci"]
 set clk_xci [file join $IPDIR "clk_wiz_0/clk_wiz_0.xci"]
-if {[file exists $mig_xci]} {
-    add_files $mig_xci
-}
-if {[file exists $clk_xci]} {
-    add_files $clk_xci
+
+if {$TOP eq "top"} {
+    if {[file exists $bram_xci]} { add_files $bram_xci }
+} elseif {$TOP eq "top_dram"} {
+    if {[file exists $mig_axi_xci]} { add_files $mig_axi_xci }
+    if {[file exists $clk_xci]} { add_files $clk_xci }
+} else {
+    _puts "ERROR: unknown top '$TOP' (expected top or top_dram)"
+    exit 1
 }
 
 # Generate all IP targets (OOC synthesis, simulation, implementation)
@@ -77,7 +84,7 @@ set_property include_dirs $SRC [get_filesets sources_1]
 #-----------------------------------------------------------------------
 # Set top module
 #-----------------------------------------------------------------------
-set_property top top [current_fileset]
+set_property top $TOP [current_fileset]
 
 #-----------------------------------------------------------------------
 # Synthesis
@@ -98,7 +105,7 @@ log "impl done"
 #-----------------------------------------------------------------------
 # Report
 #-----------------------------------------------------------------------
-set bit [file join $OUT "rv32_fpga.runs/impl_1/top.bit"]
+set bit [file join $OUT "rv32_fpga.runs/impl_1/${TOP}.bit"]
 if {![file exists $bit]} {
     _puts "ERROR: bitstream not found at $bit"
     exit 1

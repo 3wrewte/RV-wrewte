@@ -1,13 +1,41 @@
-//FILE top.v
+//FILE top_dram.v
 `timescale 1ns / 1ps
 
-// Main lightweight FPGA top: CPU/cache → AXI bridge → BRAM backend.
-module top(
+// DDR3 FPGA top: CPU/cache → AXI bridge → AXI MIG → DDR3.
+module top_dram(
     input         sys_clk,
     input         sys_rst_n,
     input         uart_rxd,
-    output        uart_txd
+    output        uart_txd,
+
+    inout  [31:0] ddr3_dq,
+    inout  [3:0]  ddr3_dqs_n,
+    inout  [3:0]  ddr3_dqs_p,
+    output [13:0] ddr3_addr,
+    output [2:0]  ddr3_ba,
+    output        ddr3_ras_n,
+    output        ddr3_cas_n,
+    output        ddr3_we_n,
+    output        ddr3_reset_n,
+    output [0:0]  ddr3_ck_p,
+    output [0:0]  ddr3_ck_n,
+    output [0:0]  ddr3_cke,
+    output [0:0]  ddr3_cs_n,
+    output [3:0]  ddr3_dm,
+    output [0:0]  ddr3_odt
 );
+    wire clk_200m;
+    wire clk_50m;
+    wire clk_100m;
+    wire locked;
+    wire rst_n = locked && sys_rst_n;
+
+    wire ui_clk;
+    wire ui_clk_sync_rst;
+    wire init_calib_complete;
+    wire mmcm_locked;
+    wire [11:0] device_temp;
+
     wire [3:0]  m_axi_awid;
     wire [28:0] m_axi_awaddr;
     wire [7:0]  m_axi_awlen;
@@ -47,11 +75,11 @@ module top(
     wire        m_axi_rvalid;
 
     RV32TOP RV32TOP_u(
-        .clk(sys_clk), .rst_n(sys_rst_n),
+        .clk(clk_50m), .rst_n(rst_n),
         .in(32'b0), .in_en(), .out(), .out_en(),
         .uart_rxd(uart_rxd), .uart_txd(uart_txd),
-        .axi_clk(sys_clk), .axi_rst_n(sys_rst_n),
-        .mig_init_calib_complete(1'b1),
+        .axi_clk(ui_clk), .axi_rst_n(~ui_clk_sync_rst & rst_n),
+        .mig_init_calib_complete(init_calib_complete),
         .m_axi_awid(m_axi_awid), .m_axi_awaddr(m_axi_awaddr),
         .m_axi_awlen(m_axi_awlen), .m_axi_awsize(m_axi_awsize),
         .m_axi_awburst(m_axi_awburst), .m_axi_awlock(m_axi_awlock),
@@ -74,8 +102,18 @@ module top(
         .m_axi_rlast(m_axi_rlast), .m_axi_rvalid(m_axi_rvalid)
     );
 
-    axi_bram_slave u_axi_bram(
-        .axi_clk(sys_clk), .axi_rst_n(sys_rst_n),
+    mig_7series_axi_0 u_mig(
+        .ddr3_addr(ddr3_addr), .ddr3_ba(ddr3_ba), .ddr3_cas_n(ddr3_cas_n),
+        .ddr3_ck_n(ddr3_ck_n), .ddr3_ck_p(ddr3_ck_p), .ddr3_cke(ddr3_cke),
+        .ddr3_ras_n(ddr3_ras_n), .ddr3_reset_n(ddr3_reset_n), .ddr3_we_n(ddr3_we_n),
+        .ddr3_dq(ddr3_dq), .ddr3_dqs_n(ddr3_dqs_n), .ddr3_dqs_p(ddr3_dqs_p),
+        .ddr3_cs_n(ddr3_cs_n), .ddr3_dm(ddr3_dm), .ddr3_odt(ddr3_odt),
+        .sys_clk_i(clk_200m), .clk_ref_i(clk_200m),
+        .ui_clk(ui_clk), .ui_clk_sync_rst(ui_clk_sync_rst), .mmcm_locked(mmcm_locked),
+        .aresetn(~ui_clk_sync_rst & rst_n), .sys_rst(rst_n),
+        .app_sr_req(1'b0), .app_ref_req(1'b0), .app_zq_req(1'b0),
+        .app_sr_active(), .app_ref_ack(), .app_zq_ack(),
+        .init_calib_complete(init_calib_complete), .device_temp(device_temp),
         .s_axi_awid(m_axi_awid), .s_axi_awaddr(m_axi_awaddr),
         .s_axi_awlen(m_axi_awlen), .s_axi_awsize(m_axi_awsize),
         .s_axi_awburst(m_axi_awburst), .s_axi_awlock(m_axi_awlock),
@@ -97,5 +135,14 @@ module top(
         .s_axi_rdata(m_axi_rdata), .s_axi_rresp(m_axi_rresp),
         .s_axi_rlast(m_axi_rlast), .s_axi_rvalid(m_axi_rvalid)
     );
+
+    clk_wiz_0 u_clk_wiz(
+        .clk_out1(clk_200m),
+        .clk_out2(clk_50m),
+        .clk_out3(clk_100m),
+        .reset(~sys_rst_n),
+        .locked(locked),
+        .clk_in1(sys_clk)
+    );
 endmodule
-//ENDFILE top.v
+//ENDFILE top_dram.v

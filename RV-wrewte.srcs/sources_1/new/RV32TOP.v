@@ -11,21 +11,50 @@ module RV32TOP(
     input         uart_rxd,
     output        uart_txd,
 
-    input         mig_ui_clk,
-    input         mig_ui_rst,
+    input         axi_clk,
+    input         axi_rst_n,
     input         mig_init_calib_complete,
-    output [27:0] app_addr,
-    output [2:0]  app_cmd,
-    output        app_en,
-    input         app_rdy,
-    output [255:0] app_wdf_data,
-    output [31:0] app_wdf_mask,
-    output        app_wdf_end,
-    output        app_wdf_wren,
-    input         app_wdf_rdy,
-    input  [255:0] app_rd_data,
-    input         app_rd_data_valid,
-    input         app_rd_data_end
+    output [3:0]  m_axi_awid,
+    output [28:0] m_axi_awaddr,
+    output [7:0]  m_axi_awlen,
+    output [2:0]  m_axi_awsize,
+    output [1:0]  m_axi_awburst,
+    output [0:0]  m_axi_awlock,
+    output [3:0]  m_axi_awcache,
+    output [2:0]  m_axi_awprot,
+    output [3:0]  m_axi_awqos,
+    output        m_axi_awvalid,
+    input         m_axi_awready,
+
+    output [31:0] m_axi_wdata,
+    output [3:0]  m_axi_wstrb,
+    output        m_axi_wlast,
+    output        m_axi_wvalid,
+    input         m_axi_wready,
+
+    output        m_axi_bready,
+    input  [3:0]  m_axi_bid,
+    input  [1:0]  m_axi_bresp,
+    input         m_axi_bvalid,
+
+    output [3:0]  m_axi_arid,
+    output [28:0] m_axi_araddr,
+    output [7:0]  m_axi_arlen,
+    output [2:0]  m_axi_arsize,
+    output [1:0]  m_axi_arburst,
+    output [0:0]  m_axi_arlock,
+    output [3:0]  m_axi_arcache,
+    output [2:0]  m_axi_arprot,
+    output [3:0]  m_axi_arqos,
+    output        m_axi_arvalid,
+    input         m_axi_arready,
+
+    output        m_axi_rready,
+    input  [3:0]  m_axi_rid,
+    input  [31:0] m_axi_rdata,
+    input  [1:0]  m_axi_rresp,
+    input         m_axi_rlast,
+    input         m_axi_rvalid
 );
     parameter FETCH_NUM = 2;
     parameter LSU_NUM   = 1;
@@ -36,7 +65,7 @@ module RV32TOP(
     localparam IDX_ALU = LSU_NUM;
     localparam IDX_BRU = LSU_NUM + ALU_NUM;
     
-    parameter ROB_SIZE     = 8;
+    parameter ROB_SIZE     = 16;
     parameter ISSUE_WINDOW = 8;
 
     pipe_t FETCH_out[FETCH_NUM-1:0];
@@ -170,9 +199,9 @@ module RV32TOP(
     BUS BUS_u(.clk(clk),.rst_n(rst_n),.Load(Load),.Store(Store),.addr(bus_addr),.data(bus_data_out),.width(bus_width),.D_data(bus_data_in),.in(in),.in_en(in_en),.out(out),.out_en(out_en),.uart_rxd(uart_rxd),.uart_txd(uart_txd));
 
     //===================================================================
-    // D-Cache subsystem: cache → mig_bridge → mock_dram
+    // D-Cache subsystem: cache → axi_bridge → AXI slave
     //===================================================================
-    cache #(.LS_SIZE(4), .CACHE_LINES(32)) cache_u(
+    cache #(.LS_SIZE(4), .CACHE_LINES(128)) cache_u(
         .clk(clk), .rst_n(rst_n),
         .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
         .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),
@@ -187,9 +216,9 @@ module RV32TOP(
         .lower_submit_data(lower_submit_data)
     );
 
-    mig_bridge bridge_u(
+    axi_bridge bridge_u(
         .clk(clk), .rst_n(rst_n),
-        .ui_clk(mig_ui_clk), .ui_rst(mig_ui_rst),
+        .axi_clk(axi_clk), .axi_rst_n(axi_rst_n),
         .lower_valid(lower_valid), .lower_ls(lower_ls),
         .lower_addr(lower_addr), .lower_data(lower_data),
         .lower_id(lower_id), .lower_mask(lower_mask),
@@ -197,12 +226,27 @@ module RV32TOP(
         .lower_submit_valid(lower_submit_valid),
         .lower_submit_id(lower_submit_id),
         .lower_submit_data(lower_submit_data),
-        .app_addr(app_addr), .app_cmd(app_cmd), .app_en(app_en), .app_rdy(app_rdy),
-        .app_wdf_data(app_wdf_data), .app_wdf_mask(app_wdf_mask),
-        .app_wdf_end(app_wdf_end), .app_wdf_wren(app_wdf_wren), .app_wdf_rdy(app_wdf_rdy),
-        .app_rd_data(app_rd_data), .app_rd_data_valid(app_rd_data_valid),
-        .app_rd_data_end(app_rd_data_end),
-        .init_calib_complete(mig_init_calib_complete)
+        .init_calib_complete(mig_init_calib_complete),
+        .m_axi_awid(m_axi_awid), .m_axi_awaddr(m_axi_awaddr),
+        .m_axi_awlen(m_axi_awlen), .m_axi_awsize(m_axi_awsize),
+        .m_axi_awburst(m_axi_awburst), .m_axi_awlock(m_axi_awlock),
+        .m_axi_awcache(m_axi_awcache), .m_axi_awprot(m_axi_awprot),
+        .m_axi_awqos(m_axi_awqos), .m_axi_awvalid(m_axi_awvalid),
+        .m_axi_awready(m_axi_awready),
+        .m_axi_wdata(m_axi_wdata), .m_axi_wstrb(m_axi_wstrb),
+        .m_axi_wlast(m_axi_wlast), .m_axi_wvalid(m_axi_wvalid),
+        .m_axi_wready(m_axi_wready),
+        .m_axi_bready(m_axi_bready), .m_axi_bid(m_axi_bid),
+        .m_axi_bresp(m_axi_bresp), .m_axi_bvalid(m_axi_bvalid),
+        .m_axi_arid(m_axi_arid), .m_axi_araddr(m_axi_araddr),
+        .m_axi_arlen(m_axi_arlen), .m_axi_arsize(m_axi_arsize),
+        .m_axi_arburst(m_axi_arburst), .m_axi_arlock(m_axi_arlock),
+        .m_axi_arcache(m_axi_arcache), .m_axi_arprot(m_axi_arprot),
+        .m_axi_arqos(m_axi_arqos), .m_axi_arvalid(m_axi_arvalid),
+        .m_axi_arready(m_axi_arready),
+        .m_axi_rready(m_axi_rready), .m_axi_rid(m_axi_rid),
+        .m_axi_rdata(m_axi_rdata), .m_axi_rresp(m_axi_rresp),
+        .m_axi_rlast(m_axi_rlast), .m_axi_rvalid(m_axi_rvalid)
     );
 
     //===================================================================

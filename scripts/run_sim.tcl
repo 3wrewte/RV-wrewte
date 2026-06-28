@@ -44,6 +44,26 @@ proc pass {msg} {
 }
 
 #-----------------------------------------------------------------------
+# Default verification: 32 outputs, monotonically non-decreasing
+#-----------------------------------------------------------------------
+proc verify_default {values} {
+    set n [llength $values]
+    if {$n < 32} {
+        fail "only $n output values (expected >= 32)"
+    }
+    # Only check first 32 (extra outputs may come from speculative wrong-path stores)
+    set prev -1
+    for {set i 0} {$i < 32} {incr i} {
+        set v [lindex $values $i]
+        if {$v < $prev} {
+            fail "output not monotonic: prev=$prev cur=$v (index $i)"
+        }
+        set prev $v
+    }
+    pass "$n outputs, monotonic, range=[lindex $values 0]..[lindex $values end]"
+}
+
+#-----------------------------------------------------------------------
 # Step 1: xvlog
 #-----------------------------------------------------------------------
 log "--- xvlog ---"
@@ -66,8 +86,8 @@ set src_files [list \
     [file join $SRC "DEC.v"] \
     [file join $SRC "cache.v"] \
     [file join $SRC "cache_wrapper.v"] \
-    [file join $SRC "mig_bridge.v"] \
-    [file join $SRC "mock_dram.v"] \
+    [file join $SRC "axi_bridge.v"] \
+    [file join $SRC "mock_dram_axi.v"] \
     [file join $SRC "rob.v"] \
     [file join $SRC "control_unit.v"] \
     [file join $SRC "BUS.v"] \
@@ -140,24 +160,4 @@ if {[file exists $CGF]} {
     source $CGF
 } else {
     verify_default $values
-}
-
-#-----------------------------------------------------------------------
-# Default verification: 32 outputs, monotonically non-decreasing
-#-----------------------------------------------------------------------
-proc verify_default {values} {
-    set n [llength $values]
-    if {$n < 32} {
-        fail "only $n output values (expected >= 32)"
-    }
-    # Only check first 32 (extra outputs may come from speculative wrong-path stores)
-    set prev -1
-    for {set i 0} {$i < 32} {incr i} {
-        set v [lindex $values $i]
-        if {$v < $prev} {
-            fail "output not monotonic: prev=$prev cur=$v (index $i)"
-        }
-        set prev $v
-    }
-    pass "$n outputs, monotonic, range=[lindex $values 0]..[lindex $values end]"
 }
