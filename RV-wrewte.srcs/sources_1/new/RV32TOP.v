@@ -27,7 +27,7 @@ module RV32TOP(
     input         app_rd_data_valid,
     input         app_rd_data_end
 );
-    parameter FETCH_NUM = 1;
+    parameter FETCH_NUM = 2;
     parameter LSU_NUM   = 1;
     parameter ALU_NUM   = 1;
     parameter BRU_NUM   = 1;
@@ -35,6 +35,9 @@ module RV32TOP(
     localparam IDX_LSU = 0;
     localparam IDX_ALU = LSU_NUM;
     localparam IDX_BRU = LSU_NUM + ALU_NUM;
+    
+    parameter ROB_SIZE     = 16;
+    parameter ISSUE_WINDOW = 8;
 
     pipe_t FETCH_out[FETCH_NUM-1:0];
     pipe_t DEC_in[FETCH_NUM-1:0], DEC_out[FETCH_NUM-1:0];
@@ -80,7 +83,7 @@ module RV32TOP(
     wire br_mispredict;
     wire [31:0] br_mispredict_rob_id, br_mispredict_target;
 
-    rob#(.ROB_SIZE(8), .ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM)) rob_u(
+    rob#(.ROB_SIZE(ROB_SIZE), .ENTRY(FETCH_NUM), .ISSUE_LSU(LSU_NUM), .ISSUE_ALU(ALU_NUM), .ISSUE_BRU(BRU_NUM), .WINDOW(ISSUE_WINDOW)) rob_u(
         .clk(clk), .rst_n(rst_n),
         .alloc_in(alloc_in), .rob_alloc_ready(rob_alloc_ready),
         .issue_out(issue_out), .receive_in(receive_in),
@@ -169,7 +172,7 @@ module RV32TOP(
     //===================================================================
     // D-Cache subsystem: cache → mig_bridge → mock_dram
     //===================================================================
-    cache #(.LS_SIZE(2), .CACHE_LINES(16)) cache_u(
+    cache #(.LS_SIZE(4), .CACHE_LINES(128)) cache_u(
         .clk(clk), .rst_n(rst_n),
         .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
         .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),

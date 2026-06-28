@@ -20,9 +20,6 @@ set IPDIR [file join $ROOT "RV-wrewte.srcs/sources_1/ip"]
 set XDC  [file join $ROOT "RV-wrewte.srcs/constrs_1/new/uart_test.xdc"]
 set MEM  [file join $SRC "init_data.mem"]
 set OUT  [file join $ROOT "build/fpga"]
-set REF_DDR [file join $ROOT "reference/4_Source_Code/1_Verilog/35T/35T/36_top_ddr3_rw"]
-set MIG_RTL [file join $REF_DDR "prj/top_ddr3_rw.gen/sources_1/ip/mig_7series_0_1/mig_7series_0/user_design/rtl"]
-set MIG_XDC [file join $REF_DDR "prj/top_ddr3_rw.gen/sources_1/ip/mig_7series_0_1/mig_7series_0/user_design/constraints/mig_7series_0.xdc"]
 
 file mkdir [file join $ROOT "log"]
 
@@ -33,6 +30,7 @@ if {!$VERBOSE} {
     proc puts {args} {}
 } else {
     proc log {msg} { puts $msg }
+    interp alias {} _puts {} puts
 }
 
 #-----------------------------------------------------------------------
@@ -51,18 +49,19 @@ add_files $src_files
 add_files $vend_files
 add_files -fileset constrs_1 $XDC
 
-if {[file exists $MIG_RTL]} {
-    set mig_rtl_files [concat \
-        [glob -nocomplain -directory $MIG_RTL *.v] \
-        [glob -nocomplain -directory $MIG_RTL */*.v]]
-    set mig_filtered [list]
-    foreach f $mig_rtl_files {
-        if {![string match "*_sim.v" [file tail $f]]} {
-            lappend mig_filtered $f
-        }
-    }
-    add_files $mig_filtered
-    add_files -fileset constrs_1 $MIG_XDC
+# Add local IP cores (MIG + clk_wiz)
+set mig_xci [file join $IPDIR "mig_7series_0/mig_7series_0.xci"]
+set clk_xci [file join $IPDIR "clk_wiz_0/clk_wiz_0.xci"]
+if {[file exists $mig_xci]} {
+    add_files $mig_xci
+}
+if {[file exists $clk_xci]} {
+    add_files $clk_xci
+}
+
+# Generate all IP targets (OOC synthesis, simulation, implementation)
+if {[llength [get_ips]] > 0} {
+    generate_target all [get_ips]
 }
 
 # Treat project .v files as SystemVerilog (for typedef struct, array ports).

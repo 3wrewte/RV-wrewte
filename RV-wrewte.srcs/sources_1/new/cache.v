@@ -159,7 +159,7 @@ reg [31:0] data_arr [LS_SIZE-1:0];
 reg [ 3:0] mask_arr [LS_SIZE-1:0];
 reg [LS_BITS-1:0] cpu_id_arr [LS_SIZE-1:0];
 // Cache storage
-reg [31:0] cache_data [CACHE_LINES-1:0];
+(* ram_style = "block" *) reg [31:0] cache_data [CACHE_LINES-1:0];
 reg [TAG_BITS-1:0] cache_tag [CACHE_LINES-1:0];
 reg cache_valid [CACHE_LINES-1:0];
 
@@ -238,11 +238,30 @@ wire [INDEX_BITS-1:0] issue_index = issue_addr[INDEX_BITS + OFFSET_BITS - 1 : OF
 wire [TAG_BITS-1:0] issue_tag = issue_addr[31 : INDEX_BITS + OFFSET_BITS];
 wire [OFFSET_BITS-1:0] issue_offset = issue_addr[OFFSET_BITS-1:0];
 wire issue_hit = cache_valid[issue_index] && (cache_tag[issue_index] == issue_tag);
-wire [31:0] issue_load_data = cache_data[issue_index];
+wire [31:0] store_hit_wdata = ((issue_data << {issue_offset, 3'b0}) & issue_mask32); // does not contain raw data
 wire need_lower = (!issue_ls) || (issue_ls && !issue_hit);
 wire can_issue = !need_lower || lower_ls_valid;
 assign issue_do = |ready && can_issue;
 
+//wire [31:0] issue_load_data = cache_data[issue_index]; //change to 1 period delay read
+reg               cache_load;
+reg [LS_BITS-1:0] cache_load_id;
+reg [31:0]        cache_load_data;
+always_ff @(posedge clk or negedge rst_n) begin
+    if(!rst_n) begin
+        cache_load      <=  1'b0;
+        cache_load_id   <=    '0;
+    end
+    else begin
+        cache_load      <= issue_do && issue_ls && issue_hit;
+        cache_load_id   <= issue_id;
+        
+    end
+end
+
+always_ff @(posedge clk) begin // no reset, in order to match BRAM judgment
+    cache_load_data <= cache_data[issue_index];
+end
 // End Issue
 
 // Receive from lower
@@ -261,34 +280,55 @@ wire [LS_BITS-1:0] submit_head = head;
     assign submit_data = data_arr[submit_head];
 // End Submit
 
-
-
-integer init_i;
-initial begin
-    for (init_i = 0; init_i < CACHE_LINES; init_i = init_i + 1) begin
-        cache_valid[init_i] = 1'b0;
-        cache_tag  [init_i] = '0;
-        cache_data [init_i] = '0;
-    end
-end
-
-// Cache write/fill logic (synchronous)
+// Cache write/fill logic (synchronous, no reset — LUTRAM)
 wire [INDEX_BITS-1:0] fill_index = addr_arr[lower_receive_id][INDEX_BITS + 1 : 2];
 wire [TAG_BITS-1:0] fill_tag = addr_arr[lower_receive_id][31 : INDEX_BITS + 2];
+/*always_ff @(posedge clk) begin // no reset, in order to match BRAM judgment
+    if (lower_receive_do) begin
+        cache_data[fill_index] <= lower_receive_data;
+    end
+    else if (issue_do && !issue_ls && issue_hit) begin
+        if (issue_mask[0]) cache_data[issue_index][7:0]   <= store_hit_wdata[7:0];
+        if (issue_mask[1]) cache_data[issue_index][15:8]  <= store_hit_wdata[15:8];
+        if (issue_mask[2]) cache_data[issue_index][23:16] <= store_hit_wdata[23:16];
+        if (issue_mask[3]) cache_data[issue_index][31:24] <= store_hit_wdata[31:24];
+    end
+end*/
+// explicit construct RAM control data
+logic        we_en;
+logic [3:0]  we_mask;
+logic [31:0] we_data;
+logic [INDEX_BITS-1:0] we_addr;
+
+assign we_en   = lower_receive_do || (issue_do && !issue_ls && issue_hit);
+assign we_addr = lower_receive_do ? fill_index : issue_index;
+assign we_data = lower_receive_do ? lower_receive_data : store_hit_wdata;
+assign we_mask = lower_receive_do ? 4'b1111 : issue_mask;
+
+always_ff @(posedge clk) begin // no reset, in order to match BRAM judgment
+    if (we_en) begin
+        if (we_mask[0]) cache_data[we_addr][7:0]   <= we_data[7:0];
+        if (we_mask[1]) cache_data[we_addr][15:8]  <= we_data[15:8];
+        if (we_mask[2]) cache_data[we_addr][23:16] <= we_data[23:16];
+        if (we_mask[3]) cache_data[we_addr][31:24] <= we_data[31:24];
+    end
+end
+    
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        // reset already handled
-    end else begin
-        if (issue_do && !issue_ls && issue_hit) begin // Store hit: update cache line
-            cache_valid[issue_index] <= 1;
-            cache_tag[issue_index] <= issue_tag;
-            cache_data[issue_index] <= ((issue_data << {issue_offset, 3'b0}) & issue_mask32) |
-                (cache_data[issue_index] & ~issue_mask32);
+        for (integer i = 0; i < CACHE_LINES; i = i + 1) begin
+            cache_valid[i] <= 1'b0;
+            cache_tag  [i] <= '0;
         end
+    end
+    else begin
         if (lower_receive_do) begin // Load miss fill: write full word from lower level
             cache_valid[fill_index] <= 1;
             cache_tag[fill_index] <= fill_tag;
-            cache_data[fill_index] <= lower_receive_data;
+        end
+        else if (issue_do && !issue_ls && issue_hit) begin // Store hit: update cache line
+            cache_valid[issue_index] <= 1;
+            cache_tag[issue_index] <= issue_tag;
         end
     end
 end
@@ -326,11 +366,12 @@ always @(*) begin
         self_receive[j] = 0;
         receive_in_data[j] = 0;
     end
-    if (issue_do && ((issue_ls && issue_hit) || !issue_ls)) begin
+    if (issue_do && !issue_ls) begin
         self_receive[issue_id] = 1;
-        if (issue_ls && issue_hit) begin
-            receive_in_data[issue_id] = issue_load_data;
-        end
+    end
+    if (cache_load) begin
+        self_receive[cache_load_id] = 1;
+        receive_in_data[cache_load_id] = cache_load_data;
     end
     if (lower_receive_do) begin
         self_receive[lower_receive_id] = 1;

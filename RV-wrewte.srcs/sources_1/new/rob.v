@@ -169,9 +169,12 @@ module rob #(
     parameter ENTRY_BITS = $clog2(ENTRY),
     parameter ISSUE_LSU = 1,
     parameter ISSUE_ALU = 1,
-    parameter ISSUE_BRU = 0,
+    parameter ISSUE_BRU = 1,
     parameter SUBMIT = 1,
-    parameter SUBMIT_BITS = $clog2(SUBMIT)
+    parameter SUBMIT_BITS = $clog2(SUBMIT),
+    parameter WINDOW = 6,
+    parameter ISSUE_WINDOW = WINDOW > ROB_SIZE? WINDOW : ROB_SIZE,
+    parameter ISSUE_WINDOW_BITS = $clog2(ISSUE_WINDOW)
 )(
     input                      clk,
     input                      rst_n,
@@ -277,16 +280,16 @@ realloc#(.WIDTH(7),.DEPTH(ROB_SIZE)) realloc_opcode(
     .out(opcode_realloc)
 );
 
-wire [32-1:0] rs_one_hot [ROB_SIZE-1:0];
-wire [32-1:0] rd_one_hot [ROB_SIZE-1:0];
-wire [32-1:0] occupied [ROB_SIZE-1:0];
-wire [ROB_SIZE-1:0] conflict_n;
-wire [ROB_SIZE-1:0] branched;
-wire [ROB_SIZE-1:0] is_lsu;
-wire [ROB_SIZE-1:0] is_branch;
-wire [ROB_SIZE-1:0] ready;
+wire [32-1:0] rs_one_hot [ISSUE_WINDOW-1:0];
+wire [32-1:0] rd_one_hot [ISSUE_WINDOW-1:0];
+wire [32-1:0] occupied   [ISSUE_WINDOW-1:0];
+wire [ISSUE_WINDOW-1:0] conflict_n;
+wire [ISSUE_WINDOW-1:0] branched;
+wire [ISSUE_WINDOW-1:0] is_lsu;
+wire [ISSUE_WINDOW-1:0] is_branch;
+wire [ISSUE_WINDOW-1:0] ready;
 generate
-for(genvar i = 0; i < ROB_SIZE; i++) begin
+for(genvar i = 0; i < ISSUE_WINDOW; i++) begin
     assign rs_one_hot[i] = (1 << rs1_realloc[i]) | (1 << rs2_realloc[i]);
     assign rd_one_hot[i] = (1 << rd_realloc[i]) & (~32'b1);
     assign is_lsu[i]    = (opcode_realloc[i] == 7'b0000011) || (opcode_realloc[i] == 7'b0100011);
@@ -296,20 +299,20 @@ endgenerate
 assign occupied[0] = rd_one_hot[0];
 assign conflict_n[0] = '1;
 generate
-for(genvar i = 1; i < ROB_SIZE; i++) begin
+for(genvar i = 1; i < ISSUE_WINDOW; i++) begin
     assign occupied[i] = occupied[i-1] | rd_one_hot[i];
     assign conflict_n[i] = ~(|(occupied[i-1] & rs_one_hot[i]));
 end
 endgenerate
 assign branched[0] = '0;
 generate
-for(genvar i = 1; i < ROB_SIZE; i++) begin
+for(genvar i = 1; i < ISSUE_WINDOW; i++) begin
     assign branched[i] = branched[i-1] | is_branch[i-1];
 end
 endgenerate
 
 generate
-for(genvar i = 0; i < ROB_SIZE; i++) begin
+for(genvar i = 0; i < ISSUE_WINDOW; i++) begin
     assign ready[i] = conflict_n[i] & (!issued_realloc[i]) & valid_realloc[i] & !(is_lsu[i] & branched[i]);
 end
 endgenerate
@@ -321,20 +324,20 @@ endgenerate
 // ALU pool: ready & ~is_lsu & ~is_branch  (U/I/R type only)
 //-----------------------------------------------------------------------
 wire [ISSUE-1:0] issue_do;
-wire [ROB_BITS-1:0] issue_id_realloc [ISSUE-1:0];
+wire [ISSUE_WINDOW_BITS-1:0] issue_id_realloc [ISSUE-1:0];
 
 generate
 for (genvar k = 0; k < ISSUE; k++) begin : gen_issue
-    wire [ROB_SIZE-1:0] pool;
+    wire [ISSUE_WINDOW-1:0] pool;
     if (k == IDX_LSU)
-        assign pool = ready & is_lsu & {ROB_SIZE{lsu_ready}};
+        assign pool = ready & is_lsu & {ISSUE_WINDOW{lsu_ready}};
     else if (k == IDX_BRU)
         assign pool = ready & is_branch;
     else
         assign pool = ready & ~is_lsu & ~is_branch;
 
-    wire [ROB_BITS-1:0] id;
-    LSB#(.WIDTH(ROB_BITS)) enc(.in(pool), .out(id));
+    wire [ISSUE_WINDOW_BITS-1:0] id;
+    LSB#(.WIDTH(ISSUE_WINDOW_BITS)) enc(.in(pool), .out(id));
     assign issue_do[k] = |pool;
     assign issue_id_realloc[k] = id;
 end
@@ -343,7 +346,7 @@ endgenerate
 wire [ROB_BITS-1:0] issue_id[ISSUE-1:0];
 generate
 for(genvar k = 0; k < ISSUE; k++) begin
-    assign issue_id[k] = issue_id_realloc[k] + head;
+    assign issue_id[k] = {{(ROB_BITS - ISSUE_WINDOW_BITS){1'b0}}, issue_id_realloc[k]} + head;
 end
 endgenerate
 // End Issue
