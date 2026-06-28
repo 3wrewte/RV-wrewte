@@ -158,10 +158,16 @@ reg [31:0] addr_arr [LS_SIZE-1:0];
 reg [31:0] data_arr [LS_SIZE-1:0];
 reg [ 3:0] mask_arr [LS_SIZE-1:0];
 reg [LS_BITS-1:0] cpu_id_arr [LS_SIZE-1:0];
+
 // Cache storage
 (* ram_style = "block" *) reg [31:0] cache_data [CACHE_LINES-1:0];
 reg [TAG_BITS-1:0] cache_tag [CACHE_LINES-1:0];
 reg cache_valid [CACHE_LINES-1:0];
+
+// Receive from lower
+wire lower_receive_do;
+wire [LS_BITS-1:0] lower_receive_id;
+wire [31:0] lower_receive_data;
 
 // Allocate
 wire alloc_ready;
@@ -241,7 +247,9 @@ wire issue_hit = cache_valid[issue_index] && (cache_tag[issue_index] == issue_ta
 wire [31:0] store_hit_wdata = ((issue_data << {issue_offset, 3'b0}) & issue_mask32); // does not contain raw data
 wire need_lower = (!issue_ls) || (issue_ls && !issue_hit);
 wire can_issue = !need_lower || lower_ls_valid;
-assign issue_do = |ready && can_issue;
+// Block store-hit issue when a fill is using the BRAM write port
+wire fill_write_conflict = lower_receive_do && (|ready) && !issue_ls && issue_hit;
+assign issue_do = (|ready) && can_issue && !fill_write_conflict;
 
 //wire [31:0] issue_load_data = cache_data[issue_index]; //change to 1 period delay read
 reg               cache_load;
@@ -264,10 +272,7 @@ always_ff @(posedge clk) begin // no reset, in order to match BRAM judgment
 end
 // End Issue
 
-// Receive from lower
-wire lower_receive_do;
-wire [LS_BITS-1:0] lower_receive_id;
-wire [31:0] lower_receive_data;
+
 assign lower_receive_do = lower_submit_valid && ls_arr[lower_submit_id] && issued[lower_submit_id] && !received[lower_submit_id];
 assign lower_receive_id = lower_submit_id;
 assign lower_receive_data = lower_submit_data;
@@ -317,8 +322,8 @@ end
 always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
         for (integer i = 0; i < CACHE_LINES; i = i + 1) begin
-            cache_valid[i] <= 1'b0;
-            cache_tag  [i] <= '0;
+            cache_valid[i] = 1'b0;
+            cache_tag  [i] = '0;
         end
     end
     else begin

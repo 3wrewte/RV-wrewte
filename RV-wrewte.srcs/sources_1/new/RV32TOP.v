@@ -36,7 +36,7 @@ module RV32TOP(
     localparam IDX_ALU = LSU_NUM;
     localparam IDX_BRU = LSU_NUM + ALU_NUM;
     
-    parameter ROB_SIZE     = 16;
+    parameter ROB_SIZE     = 8;
     parameter ISSUE_WINDOW = 8;
 
     pipe_t FETCH_out[FETCH_NUM-1:0];
@@ -172,7 +172,7 @@ module RV32TOP(
     //===================================================================
     // D-Cache subsystem: cache → mig_bridge → mock_dram
     //===================================================================
-    cache #(.LS_SIZE(4), .CACHE_LINES(128)) cache_u(
+    cache #(.LS_SIZE(4), .CACHE_LINES(32)) cache_u(
         .clk(clk), .rst_n(rst_n),
         .cpu_ls(cache_cpu_ls), .cpu_addr(cache_cpu_addr), .cpu_data(cache_cpu_data),
         .cpu_valid(cache_cpu_valid), .cpu_id(cache_cpu_id), .cpu_mask(cache_cpu_mask),
